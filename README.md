@@ -87,4 +87,20 @@ You can cite the `nf-core` publication as follows:
 
 In addition, references of tools and data used in this pipeline are as follows:
 
+> **Improved metagenomic analysis with Kraken 2.**
+>
+> Derrick E Wood, Jennifer Lu & Ben Langmead.
+>
+> _Genome biology_ 2019 Nov 28. doi: [10.1186/s13059-019-1891-0](https://doi.org/10.1186/s13059-019-1891-0)
+>
+
+>**Trimmomatic: a flexible trimmer for Illumina sequence data**
+>
+> Anthony M. Bolger, Marc Lohse & Bjoern Usadel.
+>
+> _Bioinformatics_ 2014 Aug 1. doi: [10.1093/bioinformatics/btu170](https://doi.org/10.1093/bioinformatics/btu170)
+>
+
+
+
 <!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
