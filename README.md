@@ -48,6 +48,8 @@ By default, the pipeline currently performs the following:
 <!-- TODO nf-core: Fill in short bullet-pointed list of default steps of pipeline -->
 
 * Sequencing quality control (`FastQC`)
+* Trimming of low-quality regions in the reads (`Trimmomatic`)
+* Identification and elimination of reads from the host (`Kraken 2`)
 * Overall pipeline run summaries (`MultiQC`)
 
 ## Documentation
