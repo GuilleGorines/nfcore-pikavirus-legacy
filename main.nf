@@ -64,7 +64,6 @@ if (params.help) {
 /*
  * SET UP CONFIGURATION VARIABLES
  */
- Last upload: 7 months and 16 days ago
 
 // Has the run name been specified by the user?
 // this has the bonus effect of catching both -name and --name
@@ -272,6 +271,70 @@ process TRIMMED_SAMPLES_FASTQC {
 }
 
 /*
+ * STEP 2.1 - Scout with Kraken2
+ */
+
+process SCOUT_KRAKEN2 {
+    tag "$reads"
+    label
+    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode,
+    saveAs: { filename ->
+                      filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
+                }
+
+
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+
+    output:
+    file "*_no_host.fastq" into reads_without_host 
+    file "*.report" into kraken2_reports
+    file "*.kraken" into kraken2_outputs
+
+    script:
+
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+    """
+}
+
+process EXTRACT_KRAKEN2_VIRUS {
+
+    tag "$reads"
+    label
+    
+
+
+
+    input:
+
+    output:
+
+    when:
+    
+    script:
+
+    """
+    extract_kraken_reads.py
+    --kraken-file ${name}.kraken //
+    --report-file ${name}.report //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_no_host.fastq //
+    --exclude
+
+    """
+}
+
+
+
+/*
  * STEP 2.1 - Host Removal
  */
 
@@ -298,8 +361,8 @@ process HOST_REMOVAL_KRAKEN2 {
     kraken2 --db //
     ${paired_end} //
     --threads $task.cpus //
-    --report "${name}.report" //
-    --output "${name}.kraken" //
+    --report ${name}.report //
+    --output ${name}.kraken //
 
     extract_kraken_reads.py
     --kraken-file "${name}.kraken" //
@@ -330,16 +393,18 @@ process BACTERIA_MAPPING_KRAKEN2 {
     file "*.krona" into bacteria_mappings
 
     script:
-    """
-    kraken2 --db 
-    --paired
-    --threads $task.cpus
-    --report "${name}.report"
-    --output "${name}.kraken"
+    paired_end = params.single_end ? "" : "--paired"
 
-    kreport2krona.py 
-    --report-file "${name}.report"
-    --output "${name}_bact.krona"
+    """
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+
+    kreport2krona.py //
+    --report-file ${name}.report //
+    --output ${name}_bact.krona //
     """
 }
 
@@ -361,16 +426,18 @@ process FUNGI_MAPPING_KRAKEN2 {
     file "*.krona" into bacteria_mappings
 
     script:
+    paired_end = params.single_end ? "" : "--paired"
+
     """
-    kraken2 --db 
-    --paired
-    --threads $task.cpus
-    --report ${name}.report
+    kraken2 --db //
+    -${paired_end} // 
+    --threads $task.cpus //
+    --report ${name}.report //
     --output ${name}.kraken
 
     kreport2krona.py 
-    --report-file "${name}.report"
-    --output "${name}_fungi.krona"
+    --report-file ${name}.report //
+    --output "${name}_fungi.krona
     """
 }
 /*
@@ -391,16 +458,18 @@ process VIRUS_MAPPING_KRAKEN2 {
     file "*.krona" into bacteria_mappings
 
     script:
+    paired_end = params.single_end ? "" : "--paired"
+
     """
-    kraken2 --db 
-    --paired
-    --threads $task.cpus
-    --report ${name}.report
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
     --output ${name}.kraken
 
     kreport2krona.py 
-    --report-file "${name}.report"
-    --output "${name}_virus.krona"
+    --report-file ${name}.report //
+    --output ${name}_virus.krona
     """
 }
 
@@ -446,7 +515,7 @@ process FUNGI_ASSEMBLY {
 
     script:
 
-}Coverage and graphs for fungi
+}
 
 
 
@@ -591,7 +660,7 @@ process HTML_TSV_GENERATION {
     script:
 
 }
-
+overage and graphs for fungi
 /*
 * STEP 8 - Cleanup 
 */
