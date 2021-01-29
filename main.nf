@@ -161,7 +161,11 @@ Channel.from(summary.collect{ [it.key, it.value] })
     id: 'nf-core-pikavirus-summary'
     description: " - this information is collected when the pipeline is started."
     section_name: 'nf-core/pikavirus Workflow Summary'
-    section_href: 'https://github.com/nf-core/pikavirus'
+    section_href: 'https://github.com/ads $task.cpus \\
+            --unclassified-out $unclassified \\
+            --classified-out $classified \\
+            --report ${sample}.kraken2.report.txt \\
+            --report-zero-counts \\nf-core/pikavirus'
     plot_type: 'html'
     data: |
         <dl class=\"dl-horizontal\">
@@ -173,7 +177,7 @@ Channel.from(summary.collect{ [it.key, it.value] })
 /*
  * Parse software version numbers
  */
-process get_software_versions {
+process GET_SOFTWARE_VERSION {
     publishDir "${params.outdir}/pipeline_info", mode: params.publish_dir_mode,
         saveAs: { filename ->
                       if (filename.indexOf(".csv") > 0) filename
@@ -191,6 +195,7 @@ process get_software_versions {
     echo $workflow.nextflow.version > v_nextflow.txt
     fastqc --version > v_fastqc.txt
     kraken2 --version > v_kraken2.txt
+    blastn -version > v_blastn.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
@@ -198,7 +203,8 @@ process get_software_versions {
 /*
  * STEP 1.1 - FastQC
  */
-process RAW_FASTQC {
+
+process RAW_SAMPLES_FASTQC {
     tag "$name"
     label "process_medium"
     publishDir "${params.outdir}/raw_fastqc", mode: params.publish_dir_mode,
@@ -221,13 +227,14 @@ process RAW_FASTQC {
 /*
  * STEP 1.2 - TRIMMING
  */
-process TRIMMING {
+
+process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
     tag "$name"
     label 
-    publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode
-
-    when:
-
+    publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
+    saveAs: { filename ->
+                      filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
+                }
 
     input:
     tuple val(name), file(reads) from ch_read_files_trimming
@@ -237,6 +244,9 @@ process TRIMMING {
     tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
 
     script:
+    
+    paired_end = params.single_end ? "" : "--paired"
+
     """
     Trimmomatic PE -threads $task.cpus -phred33 $reads 
     """
@@ -245,30 +255,97 @@ process TRIMMING {
 /*
  * STEP 1.3 - FastQC on trimmed reads
  */
-process TRIMMED_FASTQC {
+process TRIMMED_SAMPLES_FASTQC {
     tag "$name"
     label 
     publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-   
-    output:
+    input:filename
     file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
 
     script:
+    
     """
     fastqc --quiet --threads $task.cpus $reads
     """
 }
 
 /*
- * STEP 2.1 - Host Removal
+ * STEP 2.1 - Scout with Kraken2
  */
-process HOST_REMOVAL {
+
+process SCOUT_KRAKEN2 {
     tag "$reads"
     label
-    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode
+    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode,
+    saveAs: { filename ->
+                      filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
+                }
+
+
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+
+    output:
+    file "*_no_host.fastq" into reads_without_host 
+    file "*.report" into kraken2_reports
+    file "*.kraken" into kraken2_outputs
+
+    script:
+
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+    """
+}
+
+process EXTRACT_KRAKEN2_VIRUS {
+
+    tag "$reads"
+    label
+    
+
+
+
+    input:
+
+    output:
+
+    when:
+    
+    script:
+
+    """
+    extract_kraken_reads.py
+    --kraken-file ${name}.kraken //
+    --report-file ${name}.report //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_no_host.fastq //
+    --exclude
+
+    """
+}
+
+
+
+/*
+ * STEP 2.1 - Host Removal
+ */
+
+process HOST_REMOVAL_KRAKEN2 {
+    tag "$reads"
+    label
+    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode,
+    saveAs: { filename ->
+                      filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
+                }
+
 
     input:
     tuple val(name), file(reads) from trimmed_paired
@@ -277,60 +354,329 @@ process HOST_REMOVAL {
     file "*_no_host.fastq" into reads_without_host 
 
     script:
+
+    paired_end = params.single_end ? "" : "--paired"
+
     """
-    kraken2 --db
-    --paired
-    --threads $task.cpus
-    --report
-    --output
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken //
 
     extract_kraken_reads.py
-    --kraken-file
-    --report-file
-    -s1 sampleR1
-    -s2 sampleR2
-    --output ${reads}_no_host.fastq
+    --kraken-file "${name}.kraken" //
+    --report-file "${name}.report" //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_no_host.fastq //
     --exclude
     """
+}
+
+/*/*
+ * STEP 2.2 - Mapping for bacteria
+ */
+process BACTERIA_MAPPING_KRAKEN2 {
+
+    tag "$reads"
+    label
+    publishdir "${resultsDir}/", mode: params.publish_dir_mode
+    saveAs: { filename ->
+                        filename.indexOf(".krona") > 0 ? "mapping_result/${filename}" : "$filename"
+                    }
+
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+
+    output:
+    file "*.krona" into bacteria_mappings
+
+    script:
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+
+    kreport2krona.py //
+    --report-file ${name}.report //
+    --output ${name}_bact.krona //
+    """
+}
+
+/*
+ * STEP 2.3 - Mapping for fungi 
+ */
+process FUNGI_MAPPING_KRAKEN2 {
+    tag "$reads"
+    label
+    publishdir "${resultsDir}/", mode: params.publish_dir_mode
+    saveAs: { filename ->
+                        filename.indexOf(".krona") > 0 ? "mapping_result/${filename}" : "$filename"
+                    }
+
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+
+    output:
+    file "*.krona" into bacteria_mappings
+
+    script:
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
+    kraken2 --db //
+    -${paired_end} // 
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+
+    kreport2krona.py 
+    --report-file ${name}.report //
+    --output "${name}_fungi.krona
+    """
+}
+/*
+ * STEP 2.4 - Map Coverage and graphs for fungiing for virus 
+ */
+process VIRUS_MAPPING_KRAKEN2 {
+    tag "$reads"
+    label
+    publishdir "${resultsDir}/", mode: params.publish_dir_mode
+    saveAs: { filename ->
+                        filename.indexOf(".krona") > 0 ? "mapping_result/${filename}" : "$filename"
+                    }
+
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+
+    output:
+    file "*.krona" into bacteria_mappings
+
+    script:
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
+    kraken2 --db //
+    ${paired_end} //
+    --threads $task.cpus //
+    --report ${name}.report //
+    --output ${name}.kraken
+
+    kreport2krona.py 
+    --report-file ${name}.report //
+    --output ${name}_virus.krona
+    """
+}
+
+/*
+ * STEP 3.1 - Bacteria Assembly
+ */
+
+process BACTERIA_ASSEMBLY {
+
+    input:
+
+    output:
+
+    script:
+
+}
 
 
+/*
+ * STEP 3.2 - Virus Assembly
+ */
+
+process VIRUS_ASSEMBLY {
+
+    input:
+
+    output:
+
+    script:
+
+}
 
 
+/*
+ * STEP 3.3 - Fungi Assembly
+ */
 
+process FUNGI_ASSEMBLY {
 
+    input:
 
+    output:
 
+    script:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}
 
 
 
 /*
- * Completion e-mail notification
+ * STEP 4.1 - Bacteria BlastN
+ */
+
+process BACTERIA_BLASTN {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 4.2 - Virus BlastN
+ */
+
+process VIRUS_BLASTN {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 4.3 - Fungi BlastN
+ */
+
+process FUNGI_BLASTN {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+
+/*
+ * STEP 5.1 - Remapping for bacteria
+ */
+
+process BACTERIA_REMAPPING {
+
+    input:
+
+    output:
+
+    script:
+
+}
+Coverage and graphs for fungi
+
+/*
+ * STEP 5.2 - Remapping for virus
+ */
+
+process VIRUS_REMAPPING {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 5.3 - Remapping for fungi
+ */
+
+process FUNGI_REMAPPING {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 6.1 - Coverage and graphs for bacteria
+ */
+
+process COVERAGE_BACTERIA {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 6.2 - Coverage and graphs for virus
+ */
+
+process COVERAGE_VIRUS {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 6.3 - Coverage and graphs for fungi
+ */
+
+process COVERAGE_FUNGI {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 7 - Generate output in HTML, and tsv table for all results
+ */
+
+process HTML_TSV_GENERATION {
+
+    input:
+
+    output:
+
+    script:
+
+}
+overage and graphs for fungi
+/*
+* STEP 8 - Cleanup 
+*/
+
+process CLEANUP {
+
+    input:
+
+    output:
+
+    script:
+
+}
+
+/*
+ * STEP 9 - Completion e-mail notification - Courtesy of nf-core
  */
 workflow.onComplete {
 

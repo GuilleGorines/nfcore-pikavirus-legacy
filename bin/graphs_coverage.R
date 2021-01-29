@@ -100,7 +100,8 @@ result = tryCatch({
 	# Name columns
 	colnames(summary_cov) <- c("x1-x4","x5-x9","x10-x19",">x20","total")
 	#write.table(summary_cov, file=paste(sampleCoverageDir,sampleName,"_summaryCov.txt", sep= ''),sep="\t")
-	# summary_cov:
+	# summary_cov:            if (index (lc($line) ,lc($id)) != -1){
+
 	# gnm       	  x1          x5          x10         x20
 	# AC_000001.1	0.8869967	0.7844005	0.7025351	0.60814771
 	# AC_000002.1   0.280761	0.1780007	0.13370223	0.0825864199999999
