@@ -296,18 +296,23 @@ process SCOUT_KRAKEN2 {
     paired_end = params.single_end ? "" : "--paired"
 
     """
-    kraken2 --db //
-    ${paired_end} //
-    --threads $task.cpus //
-    --report ${name}.report //
+    kraken2 --db \\
+    ${paired_end} \\
+    --threads $task.cpus \\
+    --report ${name}.report \\
     --output ${name}.kraken
 
-    kreport2krona.py //
-    --report-file ${name}.report
+    kreport2krona.py \\
+    --report-file ${name}.report \\
     --output ${name}.krona
 
     """
 }
+
+/*
+ * STEP 2.2 - Extract virus reads
+ */
+
 
 process EXTRACT_KRAKEN2_VIRUS {
 
@@ -326,16 +331,20 @@ process EXTRACT_KRAKEN2_VIRUS {
     script:
 
     """
-    extract_kraken_reads.py
-    --kraken-file ${output} //
-    --report-file ${report} //
-    --taxid 10239 //
-    -s1 ${reads[0]} //
-    -s2 ${reads[1]} //
+    extract_kraken_reads.py \\
+    --kraken-file ${output} \\
+    --report-file ${report} \\
+    --taxid 10239 \\
+    -s1 ${reads[0]} \\
+    -s2 ${reads[1]} \\
     --output ${name}_virus.fastq
 
     """
 }
+
+/*
+ * STEP 2.3 - Extract bacterial reads
+ */
 
 process EXTRACT_KRAKEN2_BACTERIA {
 
@@ -354,16 +363,20 @@ process EXTRACT_KRAKEN2_BACTERIA {
     script:
 
     """
-    extract_kraken_reads.py
-    --kraken-file ${output} //
-    --report-file ${report} //
-    --taxid 2 //
-    -s1 ${reads[0]} //
-    -s2 ${reads[1]} //
+    extract_kraken_reads.py \\
+    --kraken-file ${output} \\
+    --report-file ${report} \\
+    --taxid 2 \\
+    -s1 ${reads[0]} \\
+    -s2 ${reads[1]} \\
     --output ${name}_bacteria.fastq
 
     """
 }
+
+/*
+ * STEP 2.4 - Extract fungal reads
+ */
 
 process EXTRACT_KRAKEN2_FUNGI {
 
@@ -382,18 +395,20 @@ process EXTRACT_KRAKEN2_FUNGI {
     script:
 
     """
-    extract_kraken_reads.py
-    --kraken-file ${output} //
-    --report-file ${report} //
-    --taxid 4751 //
-    -s1 ${reads[0]} //
-    -s2 ${reads[1]} //
+    extract_kraken_reads.py \\
+    --kraken-file ${output} \\
+    --report-file ${report} \\
+    --taxid 4751 \\
+    -s1 ${reads[0]} \\
+    -s2 ${reads[1]} \\
     --output ${name}_fungi.fastq
-
     """
 }
 
-process EXTRACT_KRAKEN2_FUNGI {
+/*
+ * STEP 2.5 - Extract reads not corresponding to bacteria, ekaryota, virus or archaea
+ */
+process EXTRACT_KRAKEN2_OTHER {
 
     tag "$reads"
     label
@@ -410,13 +425,13 @@ process EXTRACT_KRAKEN2_FUNGI {
     script:
 
     """
-    extract_kraken_reads.py
-    --kraken-file ${output} //
-    --report-file ${report} //
-    --taxid 2 2759 10239 2157 //
-    -s1 ${reads[0]} //
-    -s2 ${reads[1]} //
-    --output ${name}_other.fastq //
+    extract_kraken_reads.py \\
+    --kraken-file ${output} \\
+    --report-file ${report} \\
+    --taxid 2 2759 10239 2157 \\
+    -s1 ${reads[0]} \\
+    -s2 ${reads[1]} \\
+    --output ${name}_other.fastq \\
     --exclude 
     """
 }
@@ -425,35 +440,100 @@ process EXTRACT_KRAKEN2_FUNGI {
 /*/*
  * STEP 2.2 - Mapping for bacteria
  */
+process VIRUS_MAPPING_KRAKEN2 {
+
+    tag "$reads"
+    label
+
+    input:
+    file(reads) from virus_reads
+
+    output:
+
+    when:
+    !params.single_end
+
+    script:
+
+    """
+    spades.py \\
+    --threads $task.cpus \\
+    -1 ${reads[0]} \\
+    -2 ${reads[1]} \\
+    -o ./
+
+    """
+
+}
+
 process BACTERIA_MAPPING_KRAKEN2 {
 
     tag "$reads"
     label
-    publishdir "${resultsDir}/", mode: params.publish_dir_mode
-    saveAs: { filename ->
-                        filename.indexOf(".krona") > 0 ? "mapping_result/${filename}" : "$filename"
-                    }
 
     input:
-    tuple val(name), file(reads) from trimmed_paired
+    file(reads) from bacteria_reads
 
     output:
-    file "*.krona" into bacteria_mappings
+
+    when:
+    !params.single_end
 
     script:
-    paired_end = params.single_end ? "" : "--paired"
 
     """
-    kraken2 --db //
-    ${paired_end} //
-    --threads $task.cpus //
-    --report ${name}.report //
-    --output ${name}.kraken
+    spades.py \\
+    --threads $task.cpus \\
+    -1 ${reads[0]} \\
+    -2 ${reads[1]} \\
+    -o ./
 
-    kreport2krona.py //
-    --report-file ${name}.report //
-    --output ${name}_bact.krona //
     """
+}
+
+process FUNGI_MAPPING_KRAKEN2 {
+
+    tag "$reads"
+    label
+
+    input:
+    file(reads) from fungi_reads
+
+    output:
+
+    when:
+    !params.single_end
+
+    script:
+
+    """
+    spades.py \\
+    --threads $task.cpus \\
+    -1 ${reads[0]} \\
+    -2 ${reads[1]} \\
+    -o ./
+
+    """
+}
+
+process ASSEMBLY_EVALUATION_QUAST {
+
+
+
+    input:
+
+    output:
+    
+    script:
+    """
+    metaquast.p -f $contigs
+
+
+    """
+
+
+
+
 }
 
 /*
