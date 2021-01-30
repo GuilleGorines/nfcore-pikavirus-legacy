@@ -96,7 +96,7 @@ In addition, references of tools and data used in this pipeline are as follows:
 > _Genome biology_ 2019 Nov 28. doi: [10.1186/s13059-019-1891-0](https://doi.org/10.1186/s13059-019-1891-0)
 >
 
->**Trimmomatic: a flexible trimmer for Illumina sequence data**
+>**Trimmomatic: a flexible trimmer for Illumina sequence data.**
 >
 > Anthony M. Bolger, Marc Lohse & Bjoern Usadel.
 >
@@ -105,4 +105,3 @@ In addition, references of tools and data used in this pipeline are as follows:
 
 
 
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
