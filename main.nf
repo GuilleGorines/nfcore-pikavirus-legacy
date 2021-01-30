@@ -287,9 +287,9 @@ process SCOUT_KRAKEN2 {
     tuple val(name), file(reads) from trimmed_paired
 
     output:
-    file "*_no_host.fastq" into reads_without_host 
     file "*.report" into kraken2_reports
     file "*.kraken" into kraken2_outputs
+    file "*.krona" into krona_taxonomy
 
     script:
 
@@ -301,6 +301,11 @@ process SCOUT_KRAKEN2 {
     --threads $task.cpus //
     --report ${name}.report //
     --output ${name}.kraken
+
+    kreport2krona.py //
+    --report-file ${name}.report
+    --output ${name}.krona
+
     """
 }
 
@@ -309,70 +314,113 @@ process EXTRACT_KRAKEN2_VIRUS {
     tag "$reads"
     label
     
-
-
-
-    input:
-
-    output:
-
-    when:
-    
-    script:
-
-    """
-    extract_kraken_reads.py
-    --kraken-file ${name}.kraken //
-    --report-file ${name}.report //
-    -s1 ${reads[0]} //
-    -s2 ${reads[1]} //
-    --output ${name}_no_host.fastq //
-    --exclude
-
-    """
-}
-
-
-
-/*
- * STEP 2.1 - Host Removal
- */
-
-process HOST_REMOVAL_KRAKEN2 {
-    tag "$reads"
-    label
-    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode,
-    saveAs: { filename ->
-                      filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
-                }
-
-
     input:
     tuple val(name), file(reads) from trimmed_paired
+    file(report) from kraken2_reports
+    file(output) from kraken2_outputs
 
     output:
-    file "*_no_host.fastq" into reads_without_host 
+
+    file "*_virus.fastq" into virus_reads
 
     script:
 
-    paired_end = params.single_end ? "" : "--paired"
-
     """
-    kraken2 --db //
-    ${paired_end} //
-    --threads $task.cpus //
-    --report ${name}.report //
-    --output ${name}.kraken //
-
     extract_kraken_reads.py
-    --kraken-file "${name}.kraken" //
-    --report-file "${name}.report" //
+    --kraken-file ${output} //
+    --report-file ${report} //
+    --taxid 10239 //
     -s1 ${reads[0]} //
     -s2 ${reads[1]} //
-    --output ${name}_no_host.fastq //
-    --exclude
+    --output ${name}_virus.fastq
+
     """
 }
+
+process EXTRACT_KRAKEN2_BACTERIA {
+
+    tag "$reads"
+    label
+    
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+    file(report) from kraken2_reports
+    file(output) from kraken2_outputs
+
+    output:
+
+    file "*_bacteria.fastq" into bacteria_reads
+
+    script:
+
+    """
+    extract_kraken_reads.py
+    --kraken-file ${output} //
+    --report-file ${report} //
+    --taxid 2 //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_bacteria.fastq
+
+    """
+}
+
+process EXTRACT_KRAKEN2_FUNGI {
+
+    tag "$reads"
+    label
+    
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+    file(report) from kraken2_reports
+    file(output) from kraken2_outputs
+
+    output:
+
+    file "*_fungi.fastq" into fungi_reads
+
+    script:
+
+    """
+    extract_kraken_reads.py
+    --kraken-file ${output} //
+    --report-file ${report} //
+    --taxid 4751 //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_fungi.fastq
+
+    """
+}
+
+process EXTRACT_KRAKEN2_FUNGI {
+
+    tag "$reads"
+    label
+    
+    input:
+    tuple val(name), file(reads) from trimmed_paired
+    file(report) from kraken2_reports
+    file(output) from kraken2_outputs
+
+    output:
+
+    file "*_other.fastq" into other_reads
+
+    script:
+
+    """
+    extract_kraken_reads.py
+    --kraken-file ${output} //
+    --report-file ${report} //
+    --taxid 2 2759 10239 2157 //
+    -s1 ${reads[0]} //
+    -s2 ${reads[1]} //
+    --output ${name}_other.fastq //
+    --exclude 
+    """
+}
+
 
 /*/*
  * STEP 2.2 - Mapping for bacteria
