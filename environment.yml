@@ -16,3 +16,5 @@ dependencies:
   - bioconda::kraken2=2.0.7
   - bioconda::trimmomatic=0.39
   - bioconda::blast=2.10.1
+  - bioconda::biopython=1.70
+  - bioconda::quast=5.0.2

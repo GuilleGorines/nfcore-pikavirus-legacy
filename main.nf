@@ -260,7 +260,7 @@ process TRIMMED_SAMPLES_FASTQC {
     label 
     publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
-    input:filename
+    input:
     file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
 
     script:
@@ -290,7 +290,7 @@ process SCOUT_KRAKEN2 {
     file "*.report" into kraken2_reports
     file "*.kraken" into kraken2_outputs
     file "*.krona" into krona_taxonomy
-
+    file "*_unclassified.fastq" into unclassified_reads
     script:
 
     paired_end = params.single_end ? "" : "--paired"
@@ -300,7 +300,9 @@ process SCOUT_KRAKEN2 {
     ${paired_end} \\
     --threads $task.cpus \\
     --report ${name}.report \\
-    --output ${name}.kraken
+    --output ${name}.kraken \\
+    --unclassified-out ${name}_unclassified.fastq \\
+    ${reads}
 
     kreport2krona.py \\
     --report-file ${name}.report \\
@@ -330,13 +332,14 @@ process EXTRACT_KRAKEN2_VIRUS {
 
     script:
 
+    read = params.single_reads ? "-s1 ${reads[0]} -s2 ${reads[1]}" : "-s ${reads[0]}"    
+
     """
     extract_kraken_reads.py \\
     --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 10239 \\
-    -s1 ${reads[0]} \\
-    -s2 ${reads[1]} \\
+    ${read} \\
     --output ${name}_virus.fastq
 
     """
@@ -405,42 +408,13 @@ process EXTRACT_KRAKEN2_FUNGI {
     """
 }
 
+
+
+if 
 /*
- * STEP 2.5 - Extract reads not corresponding to bacteria, ekaryota, virus or archaea
+ * STEP 3.1.1 - Mapping virus with 
  */
-process EXTRACT_KRAKEN2_OTHER {
-
-    tag "$reads"
-    label
-    
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-    file(report) from kraken2_reports
-    file(output) from kraken2_outputs
-
-    output:
-
-    file "*_other.fastq" into other_reads
-
-    script:
-
-    """
-    extract_kraken_reads.py \\
-    --kraken-file ${output} \\
-    --report-file ${report} \\
-    --taxid 2 2759 10239 2157 \\
-    -s1 ${reads[0]} \\
-    -s2 ${reads[1]} \\
-    --output ${name}_other.fastq \\
-    --exclude 
-    """
-}
-
-
-/*/*
- * STEP 2.2 - Mapping for bacteria
- */
-process VIRUS_MAPPING_KRAKEN2 {
+process VIRUS_MAPPING_METASPADES {
 
     tag "$reads"
     label
@@ -457,6 +431,7 @@ process VIRUS_MAPPING_KRAKEN2 {
 
     """
     spades.py \\
+    --meta \\
     --threads $task.cpus \\
     -1 ${reads[0]} \\
     -2 ${reads[1]} \\
@@ -466,7 +441,10 @@ process VIRUS_MAPPING_KRAKEN2 {
 
 }
 
-process BACTERIA_MAPPING_KRAKEN2 {
+/*
+ * STEP 3.2 - Mapping bacteria
+ */
+process BACTERIA_MAPPING_METASPADES {
 
     tag "$reads"
     label
@@ -483,15 +461,18 @@ process BACTERIA_MAPPING_KRAKEN2 {
 
     """
     spades.py \\
+    --meta \\
     --threads $task.cpus \\
     -1 ${reads[0]} \\
     -2 ${reads[1]} \\
     -o ./
-
     """
 }
 
-process FUNGI_MAPPING_KRAKEN2 {
+/*
+ * STEP 3.3 - Mapping fungi
+ */
+process FUNGI_MAPPING_METASPADES {
 
     tag "$reads"
     label
@@ -501,13 +482,15 @@ process FUNGI_MAPPING_KRAKEN2 {
 
     output:
 
+
     when:
-    !params.single_end
+    !params.skip_assembly
 
     script:
 
     """
     spades.py \\
+    -- meta \\
     --threads $task.cpus \\
     -1 ${reads[0]} \\
     -2 ${reads[1]} \\
@@ -516,7 +499,12 @@ process FUNGI_MAPPING_KRAKEN2 {
     """
 }
 
-process ASSEMBLY_EVALUATION_QUAST {
+/*
+ * STEP 3.4 - Evaluating assemblies
+ */
+
+
+process ASSEMBLY_EVALUATION_QUAST_ {
 
 
 
