@@ -23,7 +23,7 @@ def helpMessage() {
     Mandatory arguments:
       --input [file]                  Path to input data (must be surrounded with quotes)
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
-                                      Available: conda, docker, singularity, test, awsbatch, <institute> and more
+                                      Available: conda, docker, singularity, test, test_paired_end, test_single_end, awsbatch
 
     Performance arguments:
       --max_memory [int].GB           Maximum quantity of memory to be used in the whole pipeline
@@ -31,11 +31,13 @@ def helpMessage() {
       --max_time [int].h              Maximum time for the pipeline to finish
 
     Options:
-      --single_end [bool]             Specifies that the input is single-end reads
+      --single_end [bool]             Specifies that the input is single-end reads (Default: false)
       --trimming [bool]               Perform initial trimming of lower-quality sections (Default: true)
+      --kraken2_db 
       --virus [bool]                  Search for virus (Default: true)
       --bacteria [bool]               Search for bacteria (Default: true)
       --fungi [bool]                  Search for fungi (Default: true)
+      --skip_assembly [bool]          Skip the assembly steps (Default: false)
       --cleanup [bool]                Remove intermediate files after pipeline completion (Default: false)
       --outdir [file]                 The output directory where the results will be saved (Default: './results')
       --publish_dir_mode [str]        Mode for publishing results in the output directory. Available: symlink, rellink, link, copy, copyNoFollow, move (Default: 'copy')
@@ -203,7 +205,6 @@ process GET_SOFTWARE_VERSION {
 /*
  * STEP 1.1 - FastQC
  */
-
 process RAW_SAMPLES_FASTQC {
     tag "$name"
     label "process_medium"
@@ -216,7 +217,7 @@ process RAW_SAMPLES_FASTQC {
     set val(name), file(reads) from raw_reads
 
     output:
-    file "*_fastqc.{zip,html}" into ch_fastqc_results
+    file "*_fastqc.{zip,html}" into fastqc_results
 
     script:
     """
@@ -227,7 +228,6 @@ process RAW_SAMPLES_FASTQC {
 /*
  * STEP 1.2 - TRIMMING
  */
-
 process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
     tag "$name"
     label 
@@ -237,7 +237,7 @@ process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
                 }
 
     input:
-    tuple val(name), file(reads) from ch_read_files_trimming
+    tuple val(name), file(reads) from raw_reads
 
     output:
     tuple val(name), file("*_paired.fastq") into trimmed_paired
@@ -245,10 +245,10 @@ process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
 
     script:
     
-    paired_end = params.single_end ? "" : "--paired"
+    paired_end = params.single_end ? "" : "PE"
 
     """
-    Trimmomatic PE -threads $task.cpus -phred33 $reads 
+    Trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
     """
 }
 
@@ -261,6 +261,9 @@ process TRIMMED_SAMPLES_FASTQC {
     publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
     input:
+    tuple val(name), file(reads) 
+
+    output:
     file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
 
     script:
@@ -273,11 +276,10 @@ process TRIMMED_SAMPLES_FASTQC {
 /*
  * STEP 2.1 - Scout with Kraken2
  */
-
 process SCOUT_KRAKEN2 {
     tag "$reads"
     label
-    publishDir "${resultsDir}/host_removed_reads", mode: params.publish_dir_mode,
+    publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
     saveAs: { filename ->
                       filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
                 }
@@ -314,15 +316,48 @@ process SCOUT_KRAKEN2 {
 
     """
 }
+/*
+ * STEP 2.1.2 - Krona output for kraken scout
+ */
+process KRONA_KRAKEN_RESULTS {
+    tag
+    label
+    publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
+    saveAs: {}
+
+    input:
+    file(report) from kraken2_reports
+
+    output:
+    file "*.krona.html" into krona_taxonomy
+
+    script:
+
+    name = ${report.baseName}
+    """
+    kreport2krona.py \\
+    --report-file $report \\
+    --output ${name}.krona
+
+    ktImportText \\
+    -o ${name}.krona.html \\
+    ${name}.krona
+
+    """
+
+    
+
+
+
+
+}
 
 /*
  * STEP 2.2 - Extract virus reads
  */
-
-
 process EXTRACT_KRAKEN2_VIRUS {
 
-    tag "$reads"
+    tag "$name"
     label
     
     input:
@@ -344,14 +379,12 @@ process EXTRACT_KRAKEN2_VIRUS {
     --taxid 10239 \\
     ${read} \\
     --output ${name}_virus.fastq
-
     """
 }
 
 /*
  * STEP 2.3 - Extract bacterial reads
  */
-
 process EXTRACT_KRAKEN2_BACTERIA {
 
     tag "$reads"
@@ -381,7 +414,6 @@ process EXTRACT_KRAKEN2_BACTERIA {
 /*
  * STEP 2.4 - Extract fungal reads
  */
-
 process EXTRACT_KRAKEN2_FUNGI {
 
     tag "$reads"
@@ -392,21 +424,18 @@ process EXTRACT_KRAKEN2_FUNGI {
     file "*_fungi.fastq" into fungi_reads
 
     script:
+    read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
 
     """
     extract_kraken_reads.py \\
     --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 4751 \\
-    -s1 ${reads[0]} \\
-    -s2 ${reads[1]} \\
+    ${read} \\
     --output ${name}_fungi.fastq
     """
 }
-
-
-
-if 
+ 
 /*
  * STEP 3.1.1 - Mapping virus 
  */
@@ -419,10 +448,9 @@ process VIRUS_MAPPING_METASPADES {
     file(reads) from virus_reads
 
     output:
-    file "scaffolds.fa" into virus_mapping
+    file "metaspades_result/contigs.fasta" into virus_mapping
 
     script:
-
     meta = params.single_end ? "" : "--meta"
     read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
 
@@ -430,10 +458,8 @@ process VIRUS_MAPPING_METASPADES {
     spades.py \\
     $meta \\
     --threads $task.cpus \\
-    -1 ${reads[0]} \\
-    -2 ${reads[1]} \\
-    -o ./
-
+    $reads \\
+    -o metaspades_result
     """
 
 }
@@ -450,18 +476,21 @@ process BACTERIA_MAPPING_METASPADES {
     file(reads) from bacteria_reads
 
     output:
+    file "metaspades_result/contigs.fasta" into bacteria_mapping
 
     when:
+    
 
     script:
+    meta = params.single_end ? "" : "--meta"
+    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
 
     """
     spades.py \\
-    --meta \\
+    $meta \\
     --threads $task.cpus \\
-    -1 ${reads[0]} \\
-    -2 ${reads[1]} \\
-    -o ./
+    $reads \\
+    -o metaspades_result
     """
 }
 
@@ -477,39 +506,44 @@ process FUNGI_MAPPING_METASPADES {
     file(reads) from fungi_reads
 
     output:
-
+    file "metaspades_result/contigs.fa" into fungi_mapping
 
     when:
+  
 
     script:
+    meta = params.single_end ? "" : "--meta"
+    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
 
     """
     spades.py \\
-    -- meta \\
+    $meta \\
     --threads $task.cpus \\
-    -1 ${reads[0]} \\
-    -2 ${reads[1]} \\
-    -o ./
+    $reads \\
+    -o metaspades_result
 
     """
 }
 
 /*
- * STEP 3.4 - Evaluating assemblies
+ * STEP 3.4 - Evaluating virus assembly
  */
-
-
-process ASSEMBLY_EVALUATION_QUAST_ {
-
-
+process QUAST_EVALUATION_VIRUS {
+    tag
+    label
 
     input:
+    file(contig) from virus_mapping
 
     output:
-    
+    file "/quast_results/report.html" into quast_results_virus
+
+
     script:
     """
-    metaquast.p -f $contigs
+    metaquast.py \\
+    -f $contigs \\
+    -o quast_results
 
 
     """
@@ -551,6 +585,7 @@ process FUNGI_MAPPING_KRAKEN2 {
     --output "${name}_fungi.krona
     """
 }
+
 /*
  * STEP 2.4 - Map Coverage and graphs for fungiing for virus 
  */
@@ -587,7 +622,6 @@ process VIRUS_MAPPING_KRAKEN2 {
 /*
  * STEP 3.1 - Bacteria Assembly
  */
-
 process BACTERIA_ASSEMBLY {
 
     input:
@@ -602,7 +636,6 @@ process BACTERIA_ASSEMBLY {
 /*
  * STEP 3.2 - Virus Assembly
  */
-
 process VIRUS_ASSEMBLY {
 
     input:
@@ -617,7 +650,6 @@ process VIRUS_ASSEMBLY {
 /*
  * STEP 3.3 - Fungi Assembly
  */
-
 process FUNGI_ASSEMBLY {
 
     input:
@@ -633,7 +665,6 @@ process FUNGI_ASSEMBLY {
 /*
  * STEP 4.1 - Bacteria BlastN
  */
-
 process BACTERIA_BLASTN {
 
     input:
@@ -647,7 +678,6 @@ process BACTERIA_BLASTN {
 /*
  * STEP 4.2 - Virus BlastN
  */
-
 process VIRUS_BLASTN {
 
     input:
@@ -661,7 +691,6 @@ process VIRUS_BLASTN {
 /*
  * STEP 4.3 - Fungi BlastN
  */
-
 process FUNGI_BLASTN {
 
     input:
@@ -676,7 +705,6 @@ process FUNGI_BLASTN {
 /*
  * STEP 5.1 - Remapping for bacteria
  */
-
 process BACTERIA_REMAPPING {
 
     input:
@@ -691,7 +719,6 @@ Coverage and graphs for fungi
 /*
  * STEP 5.2 - Remapping for virus
  */
-
 process VIRUS_REMAPPING {
 
     input:
@@ -705,7 +732,6 @@ process VIRUS_REMAPPING {
 /*
  * STEP 5.3 - Remapping for fungi
  */
-
 process FUNGI_REMAPPING {
 
     input:
@@ -719,7 +745,6 @@ process FUNGI_REMAPPING {
 /*
  * STEP 6.1 - Coverage and graphs for bacteria
  */
-
 process COVERAGE_BACTERIA {
 
     input:
@@ -733,7 +758,6 @@ process COVERAGE_BACTERIA {
 /*
  * STEP 6.2 - Coverage and graphs for virus
  */
-
 process COVERAGE_VIRUS {
 
     input:
@@ -747,7 +771,6 @@ process COVERAGE_VIRUS {
 /*
  * STEP 6.3 - Coverage and graphs for fungi
  */
-
 process COVERAGE_FUNGI {
 
     input:
@@ -761,7 +784,6 @@ process COVERAGE_FUNGI {
 /*
  * STEP 7 - Generate output in HTML, and tsv table for all results
  */
-
 process HTML_TSV_GENERATION {
 
     input:
@@ -771,11 +793,10 @@ process HTML_TSV_GENERATION {
     script:
 
 }
-overage and graphs for fungi
+
 /*
 * STEP 8 - Cleanup 
 */
-
 process CLEANUP {
 
     input:
