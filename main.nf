@@ -289,7 +289,7 @@ process SCOUT_KRAKEN2 {
     output:
     file "*.report" into kraken2_reports
     file "*.kraken" into kraken2_outputs
-    file "*.krona" into krona_taxonomy
+    file "*.krona.html" into krona_taxonomy
     file "*_unclassified.fastq" into unclassified_reads
     script:
 
@@ -307,6 +307,10 @@ process SCOUT_KRAKEN2 {
     kreport2krona.py \\
     --report-file ${name}.report \\
     --output ${name}.krona
+
+    ktImportText \\
+    -o ${name}.krona.html \\
+    ${name}.krona
 
     """
 }
@@ -327,12 +331,11 @@ process EXTRACT_KRAKEN2_VIRUS {
     file(output) from kraken2_outputs
 
     output:
-
     file "*_virus.fastq" into virus_reads
 
     script:
 
-    read = params.single_reads ? "-s1 ${reads[0]} -s2 ${reads[1]}" : "-s ${reads[0]}"    
+    read = params.single_end ? "-s ${reads[0]}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
 
     """
     extract_kraken_reads.py \\
@@ -360,20 +363,18 @@ process EXTRACT_KRAKEN2_BACTERIA {
     file(output) from kraken2_outputs
 
     output:
-
     file "*_bacteria.fastq" into bacteria_reads
 
     script:
+    read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
 
     """
     extract_kraken_reads.py \\
     --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 2 \\
-    -s1 ${reads[0]} \\
-    -s2 ${reads[1]} \\
+    ${read} \\
     --output ${name}_bacteria.fastq
-
     """
 }
 
@@ -385,11 +386,6 @@ process EXTRACT_KRAKEN2_FUNGI {
 
     tag "$reads"
     label
-    
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-    file(report) from kraken2_reports
-    file(output) from kraken2_outputs
 
     output:
 
@@ -412,7 +408,7 @@ process EXTRACT_KRAKEN2_FUNGI {
 
 if 
 /*
- * STEP 3.1.1 - Mapping virus with 
+ * STEP 3.1.1 - Mapping virus 
  */
 process VIRUS_MAPPING_METASPADES {
 
@@ -423,15 +419,16 @@ process VIRUS_MAPPING_METASPADES {
     file(reads) from virus_reads
 
     output:
-
-    when:
-    !params.single_end
+    file "scaffolds.fa" into virus_mapping
 
     script:
 
+    meta = params.single_end ? "" : "--meta"
+    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+
     """
     spades.py \\
-    --meta \\
+    $meta \\
     --threads $task.cpus \\
     -1 ${reads[0]} \\
     -2 ${reads[1]} \\
@@ -455,7 +452,6 @@ process BACTERIA_MAPPING_METASPADES {
     output:
 
     when:
-    !params.single_end
 
     script:
 
@@ -484,7 +480,6 @@ process FUNGI_MAPPING_METASPADES {
 
 
     when:
-    !params.skip_assembly
 
     script:
 
