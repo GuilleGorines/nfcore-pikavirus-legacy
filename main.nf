@@ -201,9 +201,6 @@ process GET_SOFTWARE_VERSION {
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
-
-
-
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
@@ -226,13 +223,10 @@ process UNTAR_KRAKEN2DB {
     """
     tar -xvf $database
     """
+
+} else {
+    untar_kraken2_db = file(params.kraken2_db)
 }
-
-
-
-}
-
-
 
 /*
  * STEP 1.1 - FastQC
@@ -349,7 +343,6 @@ process KRONA_KRAKEN_RESULTS {
     label
     publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
     saveAs: {}
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
 
     input:
     file(report) from kraken2_reports
@@ -391,8 +384,7 @@ process EXTRACT_KRAKEN2_VIRUS {
 
     """
     extract_kraken_reads.py \\
-    --kraken-file ${outkaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
-put} \\
+    --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 10239 \\
     ${read} \\
@@ -404,7 +396,6 @@ put} \\
  * STEP 2.3 - Extract bacterial reads
  */
 process EXTRACT_KRAKEN2_BACTERIA {
-
     tag "$name"
     label
     
@@ -433,7 +424,6 @@ process EXTRACT_KRAKEN2_BACTERIA {
  * STEP 2.4 - Extract fungal reads
  */
 process EXTRACT_KRAKEN2_FUNGI {
-
     tag "$name"
     label
 
@@ -462,7 +452,6 @@ process EXTRACT_KRAKEN2_FUNGI {
  * STEP 3.1 - Mapping virus 
  */
 process VIRUS_MAPPING_METASPADES {
-
     tag "$name"
     label
 
@@ -490,7 +479,6 @@ process VIRUS_MAPPING_METASPADES {
  * STEP 3.2 - Mapping bacteria
  */
 process BACTERIA_MAPPING_METASPADES {
-
     tag "$name"
     label
 
@@ -498,10 +486,7 @@ process BACTERIA_MAPPING_METASPADES {
     file(bacteria_read) from bacteria_reads
 
     output:
-    tuple val(name),file("metaspades_result/contigs.fasta") into bacteria_mapping
-
-    when:
-    
+    tuple val(name),file("metaspades_result/contigs.fasta") into bacteria_mapping 
 
     script:
     meta = params.single_end ? "" : "--meta"
@@ -529,7 +514,6 @@ process FUNGI_MAPPING_METASPADES {
 
     output:
     tuple val(name), file("metaspades_result/contigs.fasta") into fungi_mapping
-
  
     script:
     meta = params.single_end ? "" : "--meta"
@@ -572,7 +556,6 @@ process QUAST_EVALUATION_VIRUS {
 process QUAST_EVALUATION_VIRUS {
     tag "$name"
     label
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
 
     input:
     tuple val(name), file(contig) from bacteria_mapping

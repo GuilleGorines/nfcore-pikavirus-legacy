@@ -75,10 +75,13 @@ If `-profile` is not specified, the pipeline will run locally and expect all sof
   * Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity or Podman.
   * A generic configuration profile to be used with [Conda](https://conda.io/docs/)
   * Pulls most software from [Bioconda](https://bioconda.github.io/)
-* `test`
-  * A profile with a complete configuration for automated testing
-  * Includes links to test data so needs no other parameters
-
+* `test_single_end`
+  * A profile with a complete configuration for automated testing with single end sequencing
+  * data. Includes links to test data so no other parameter is needed.
+* `test_paired_end`
+  * A profile with a complete configuration for automated testing with paired end sequencing
+  * data. Includes links to test data so no other parameter is needed.
+  
 ### `-resume`
 
 Specify this when restarting a pipeline. Nextflow will used cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously.
