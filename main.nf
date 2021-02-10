@@ -123,7 +123,7 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
 summary['Data Type']        = params.single_end ? 'Single-End' : 'Paired-End'
-summary['Trimming']         = params.trimming
+summary['Trimming--']       = params.outdir
 summary['Virus Search']     = params.virus
 summary['Bacteria Search']  = params.bacteria
 summary['Fungi Search']     = params.fungi
@@ -202,37 +202,31 @@ process GET_SOFTWARE_VERSION {
     """
 }
 
-
-
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
-
 if (params.kraken2_db.endsWith('tar.gz')){
 
-process UNTAR_KRAKEN2DB {
-    label 'error_retry'
+    process UNTAR_KRAKEN2DB {
+        label 'error_retry'
 
-    input:
-    path(database) from params.kraken2_db
+        input:
+        path(database) from params.kraken2_db
 
-    output:
-    path "$untardb" into untar_kraken2_db
+        output:
+        path "$untardb" into untar_kraken2_db
 
-    script:
+        script:
 
-    untardb=db.toString() - ".tar.gz"
+        untardb=db.toString() - ".tar.gz"
 
-    """
-    tar -xvf $database
-    """
+        """
+        tar -xvf $database
+        """
+    }
+} else {
+    untar_kraken2_db = params.kraken2_db
 }
-
-
-
-}
-
-
 
 /*
  * STEP 1.1 - FastQC
@@ -305,7 +299,7 @@ process TRIMMED_SAMPLES_FASTQC {
 }
 
 /*
- * STEP 2.1 - Scout with Kraken2
+ * STEP 2.1.1 - Scout with Kraken2
  */
 process SCOUT_KRAKEN2 {
     tag "$name"
@@ -324,20 +318,19 @@ process SCOUT_KRAKEN2 {
     file "*.report" into kraken2_reports
     file "*.kraken" into kraken2_outputs
     file "*.krona.html" into krona_taxonomy
-    file "*_unclassified.fastq" into unclassified_reads
+    tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
+    
     script:
-
     paired_end = params.single_end ? "" : "--paired"
-
+    filename = "${name}_unclassified"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
     --threads $task.cpus \\
     --report ${name}.report \\
     --output ${name}.kraken \\
-    --unclassified-out ${name}_unclassified.fastq \\
+    --unclassified-out ${filename}.fastq \\
     ${reads}
-
     """
 }
 
@@ -349,7 +342,6 @@ process KRONA_KRAKEN_RESULTS {
     label
     publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
     saveAs: {}
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
 
     input:
     file(report) from kraken2_reports
@@ -384,19 +376,18 @@ process EXTRACT_KRAKEN2_VIRUS {
     file(output) from kraken2_outputs
 
     output:
-    file "*_virus.fastq" into virus_reads
+    tuple val(filename), file("*_virus.fastq") into virus_reads
 
     script:
     read = params.single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-
+    filename = "${name}_virus"
     """
     extract_kraken_reads.py \\
-    --kraken-file ${outkaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
-put} \\
+    --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 10239 \\
     ${read} \\
-    --output ${name}_virus.fastq
+    --output ${filename}.fastq
     """
 }
 
@@ -404,7 +395,6 @@ put} \\
  * STEP 2.3 - Extract bacterial reads
  */
 process EXTRACT_KRAKEN2_BACTERIA {
-
     tag "$name"
     label
     
@@ -414,18 +404,18 @@ process EXTRACT_KRAKEN2_BACTERIA {
     file(output) from kraken2_outputs
 
     output:
-    file "*_bacteria.fastq" into bacteria_reads
+    tuple val(filename), file("*_bacteria.fastq") into bacteria_reads
 
     script:
     read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-
+    filename = "${name}_bacteria"
     """
     extract_kraken_reads.py \\
     --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 2 \\
     ${read} \\
-    --output ${name}_bacteria.fastq
+    --output ${filename}.fastq
     """
 }
 
@@ -433,7 +423,6 @@ process EXTRACT_KRAKEN2_BACTERIA {
  * STEP 2.4 - Extract fungal reads
  */
 process EXTRACT_KRAKEN2_FUNGI {
-
     tag "$name"
     label
 
@@ -443,26 +432,49 @@ process EXTRACT_KRAKEN2_FUNGI {
     file(output) from kraken2_outputs
 
     output:
-    file "*_fungi.fastq" into fungi_reads
+    tuple val(filename), file("*_fungi.fastq") into fungi_reads
 
     script:
     read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-
+    filename = "${name}_fungi"
     """
     extract_kraken_reads.py \\
     --kraken-file ${output} \\
     --report-file ${report} \\
     --taxid 4751 \\
     ${read} \\
-    --output ${name}_fungi.fastq
+    --output ${filename}.fastq
     """
 }
- 
+
+/*
+ * STEP 3.0 - Mapping in general
+ */
+process MAPPING_METASPADES {
+    tag "$name"
+    label
+
+    input:
+    tuple val(name), file(seq_reads) from virus_reads.concat(fungi_reads, bacteria_reads, unclassified_reads)
+
+    output:
+    tuple val(name), file("metaspades_result/contigs.fasta") into mapping
+
+    script:
+    read = params.single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+
+    """
+    spades.py \\
+    $read \\
+    --threads $task.cpus \\
+    -o ${name}
+    """
+}
+
 /*
  * STEP 3.1 - Mapping virus 
  */
-process VIRUS_MAPPING_METASPADES {
-
+process MAPPING_METASPADES {
     tag "$name"
     label
 
@@ -475,7 +487,7 @@ process VIRUS_MAPPING_METASPADES {
     script:
     meta = params.single_end ? "" : "--meta"
     read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${virus_read.baseName}
+    name = "${virus_read.baseName}_virus"
 
     """
     spades.py \\
@@ -485,6 +497,9 @@ process VIRUS_MAPPING_METASPADES {
     -o metaspades_result
     """
 }
+if (!params.virus){
+    virus_mapping = Channel.create()
+} 
 
 /*
  * STEP 3.2 - Mapping bacteria
@@ -506,7 +521,7 @@ process BACTERIA_MAPPING_METASPADES {
     script:
     meta = params.single_end ? "" : "--meta"
     read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${bacteria_read.baseName}
+    name = "${bacteria_read.baseName}_bacteria"
 
     """
     spades.py \\
@@ -516,6 +531,10 @@ process BACTERIA_MAPPING_METASPADES {
     -o metaspades_result
     """
 }
+
+if (!params.bacteria){
+    bacteria_mapping = Channel.create()
+} 
 
 /*
  * STEP 3.3 - Mapping fungi
@@ -534,7 +553,39 @@ process FUNGI_MAPPING_METASPADES {
     script:
     meta = params.single_end ? "" : "--meta"
     read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${fungi_read.baseName}
+    name = "${fungi_read.baseName}_fungi"
+
+    """
+    spades.py \\
+    $meta \\
+    --threads $task.cpus \\
+    $reads \\
+    -o metaspades_result
+    """
+}
+
+if (!params.fungi){
+    fungi_mapping = Channel.create()
+}
+
+/*
+ * STEP 3.4 - Mapping unkwnown
+ */
+
+process UNCLASS_MAPPING_METASPADES {
+    tag "$name"
+    label
+
+    input:
+    file(unclass_reads) from unclassified_reads
+
+    output:
+    tuple val(name), file("metaspades_result/contigs.fasta") into unclassified_mapping
+ 
+    script:
+    meta = params.single_end ? "" : "--meta"
+    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+    name = "${unclass_read.baseName}"
 
     """
     spades.py \\
@@ -546,17 +597,17 @@ process FUNGI_MAPPING_METASPADES {
 }
 
 /*
- * STEP 3.4 - Evaluating virus assembly
+ * STEP 3.5 - Evaluating assembly
  */
-process QUAST_EVALUATION_VIRUS {
+process QUAST_EVALUATION {
     tag "$name"
     label
 
     input:
-    tuple val(name), file(contig) from virus_mapping
+    tuple val(name), file(contig) from virus_mapping.concat( bacteria_mapping, fungi_mapping, unclassified_mapping )
 
     output:
-    file "/quast_results/report.html" into quast_results_virus
+    file "/quast_results/report.html" into quast_results
 
     script:
     """
@@ -566,50 +617,6 @@ process QUAST_EVALUATION_VIRUS {
     """
 }
 
-/*
- * STEP 3.5 - Evaluating bacteria assembly
- */
-process QUAST_EVALUATION_VIRUS {
-    tag "$name"
-    label
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
-
-    input:
-    tuple val(name), file(contig) from bacteria_mapping
-
-    output:
-    file "/quast_results/report.html" into quast_results_bacteria
-
-    script:
-    """
-    metaquast.py \\
-    -f $contigs \\
-    -o quast_results
-    """
-}
-
-/*contigkaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
-
- * STEP 3.6 - Evaluating fungi assembly
- */
-process QUAST_EVALUATION_VIRUS {
-    tag "$name"
-    label
-
-    input:
-    tuple val(name), file(contig) from fungi_mapping
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
-
-    output:
-    file "/quast_results/report.html" into quast_results_fungi
-
-    script:
-    """
-    metaquast.py \\
-    -f $contigs \\
-    -o quast_results
-    """
-}
 
 /*
 
@@ -629,8 +636,6 @@ kaiju2table \\
 -o kaiju_summary.tsv \\
 kaiju.out
 
-kaiju
-
 kaiju-addTaxonNames 
 -t nodes.dmp 
 -n names.dmp 
@@ -638,11 +643,11 @@ kaiju-addTaxonNames
 -o kaiju.names.out
 
 
-kaiju2krona -t nodes.dmp -n names.dmp -i kaiju.out -o kaiju.out.krona
-
-
-
-*/
+kaiju2krona
+-t nodes.dmp 
+-n names.dmp 
+-i kaiju.out 
+-o kaiju.out.krona
 
 /*
  * STEP 4.1 - Bacteria BlastN
