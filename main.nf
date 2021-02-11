@@ -23,7 +23,7 @@ def helpMessage() {
     Mandatory arguments:
       --input [file]                  Path to input data (must be surrounded with quotes)
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
-                                      Available: conda, docker, singularity, test, test_paired_end, test_single_end, awsbatch
+                                      Available: conda, docker, singularity, test, test_single_end, awsbatch
 
     Performance arguments:
       --max_memory [int].GB           Maximum quantity of memory to be used in the whole pipeline
@@ -33,7 +33,9 @@ def helpMessage() {
     Options:
       --single_end [bool]             Specifies that the input is single-end reads (Default: false)
       --trimming [bool]               Perform initial trimming of lower-quality sections (Default: true)
-      --kraken2_db 
+      --kraken2_db [path]             Kraken database for taxa identification (Default: hosted on Zenodo)
+      --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: false)
+      --kaiju_db [path]               Kaiju database for contig identification (Default: )
       --virus [bool]                  Search for virus (Default: true)
       --bacteria [bool]               Search for bacteria (Default: true)
       --fungi [bool]                  Search for fungi (Default: true)
@@ -48,7 +50,6 @@ def helpMessage() {
       --version                       Show pipeline version
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
-
 
     AWSBatch options:
       --awsqueue [str]                The AWSBatch JobQueue that needs to be set when running on AWSBatch
@@ -123,7 +124,7 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
 summary['Data Type']        = params.single_end ? 'Single-End' : 'Paired-End'
-summary['Trimming']         = params.trimming
+summary['Trimming']       = params.outdir
 summary['Virus Search']     = params.virus
 summary['Bacteria Search']  = params.bacteria
 summary['Fungi Search']     = params.fungi
@@ -197,36 +198,59 @@ process GET_SOFTWARE_VERSION {
     echo $workflow.nextflow.version > v_nextflow.txt
     fastqc --version > v_fastqc.txt
     kraken2 --version > v_kraken2.txt
-    blastn -version > v_blastn.txt
+    trimmomatic -version > v_trimmomatic.txt
+    kaiju -help > v_kaiju.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
+
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
+if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endswith('.tar')){
 
-if (params.kraken2_db.endsWith('tar.gz')){
+    process UNCOMPRESS_KRAKEN2DB {
+        label 'error_retry'
 
-process UNTAR_KRAKEN2DB {
-    label 'error_retry'
+        input:
+        path(database) from params.kraken2_db
 
-    input:
-    path(database) from params.kraken2_db
+        output:
+        path "$krakendb" into kraken2_db_files
 
-    output:
-    path "$untardb" into untar_kraken2_db
+        script:
+        krakendb = database.toString() - ".tar.gz"
 
-    script:
-
-    untardb=db.toString() - ".tar.gz"
-
-    """
-    tar -xvf $database
-    """
-
+        """
+        tar -xvf $database
+        """
+    }
 } else {
-    untar_kraken2_db = file(params.kraken2_db)
+    kraken2_db_files = params.kraken2_db
 }
+
+if (params.kaiju_db.endswith('.gz') || params.kaiju_db.endswith('.tar')){
+
+    process UNCOMPRESS_KAIJUDB {
+        label 'error_retry'
+
+        input:
+        path(database) from params.kaiju_db
+
+        output:
+        tuple path("$kaijudb/*.fmi"), path("$kaijudb/nodes.dmp"), path("$kaijudb/names.dmp") into kaiju_db_files
+
+        script:
+        kaijudb = database.toString() - ".tar.gz"
+
+        """
+        tar -xvf $database
+        """
+    }
+} else {
+    kaiju_db_files = 
+}
+
 
 /*
  * STEP 1.1 - FastQC
@@ -255,51 +279,53 @@ process RAW_SAMPLES_FASTQC {
 /*
  * STEP 1.2 - TRIMMING
  */
-process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
-    tag "$name"
-    label 
-    publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
-    saveAs: { filename ->
-                      filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
-                }
+if (params.trimming) {
+    process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
+        tag "$name"
+        label 
+        publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
+        saveAs: { filename ->
+                        filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
+                    }
 
-    input:
-    tuple val(name), file(reads) from raw_reads
+        input:
+        tuple val(name), file(reads) from raw_reads
 
-    output:
-    tuple val(name), file("*_paired.fastq") into trimmed_paired
-    tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
+        output:
+        tuple val(name), file("*_paired.fastq") into trimmed_paired
+        tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
 
-    script:
-    paired_end = params.single_end ? "" : "PE"
-    """
-    Trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
-    """
+        script:
+        paired_end = params.single_end ? "" : "PE"
+        """
+        Trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
+        """
+    }
+
+    /*
+    * STEP 1.3 - FastQC on trimmed reads
+    */
+    process TRIMMED_SAMPLES_FASTQC {
+        tag "$name"
+        label 
+        publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
+
+        input:
+        tuple val(name), file(reads) from trimmed_paired
+
+        output:
+        file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
+
+        script:
+        
+        """
+        fastqc --quiet --threads $task.cpus $reads
+        """
+    }
 }
 
 /*
- * STEP 1.3 - FastQC on trimmed reads
- */
-process TRIMMED_SAMPLES_FASTQC {
-    tag "$name"
-    label 
-    publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
-
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-
-    output:
-    file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
-
-    script:
-    
-    """
-    fastqc --quiet --threads $task.cpus $reads
-    """
-}
-
-/*
- * STEP 2.1 - Scout with Kraken2
+ * STEP 2.1.1 - Scout with Kraken2
  */
 process SCOUT_KRAKEN2 {
     tag "$name"
@@ -307,21 +333,21 @@ process SCOUT_KRAKEN2 {
     publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
     saveAs: { filename ->
                       filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
-                }
-
+    }
 
     input:
-    path(kraken2db) from untar_kraken2_db
+    path(kraken2db) from kraken2_db_files
     tuple val(name), file(reads) from trimmed_paired
 
     output:
     file "*.report" into kraken2_reports
     file "*.kraken" into kraken2_outputs
     file "*.krona.html" into krona_taxonomy
-    file "*_unclassified.fastq" into unclassified_reads
+    tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
+    
     script:
-
     paired_end = params.single_end ? "" : "--paired"
+    filename = "${name}_unclassified"
 
     """
     kraken2 --db $kraken2db \\
@@ -329,447 +355,516 @@ process SCOUT_KRAKEN2 {
     --threads $task.cpus \\
     --report ${name}.report \\
     --output ${name}.kraken \\
-    --unclassified-out ${name}_unclassified.fastq \\
+    --unclassified-out ${filename}.fastq \\
     ${reads}
 
     """
 }
 
 /*
- * STEP 2.1.2 - Krona output for kraken scout
+ * STEP 2.1.2 - Krona output for Kraken scouting
  */
-process KRONA_KRAKEN_RESULTS {
-    tag "$name"
-    label
-    publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
-    saveAs: {}
+if (params.kraken2krona) {
 
-    input:
-    file(report) from kraken2_reports
+    process KRONA_KRAKEN_RESULTS {
+        tag "$name"
+        label
+        publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
+        saveAs: {}
 
-    output:
-    file "*.krona.html" into krona_taxonomy
+        input:
+        file(report) from kraken2_reports
 
-    script:
-    name = ${report.baseName}
+        output:
+        file "*.krona.html" into krona_taxonomy
 
-    """
-    kreport2krona.py \\
-    --report-file $report \\
-    --output ${name}.krona
+        script:
+        name = ${report.baseName}
 
-    ktImportText \\
-    -o ${name}.krona.html \\
-    ${name}.krona
-    """
+        """
+        kreport2krona.py \\
+        --report-file $report \\
+        --output ${name}.krona
+
+        ktImportText \\
+        -o ${name}.krona.html \\
+        ${name}.krona
+        """
+    }
 }
 
+if (!params.skip_assembly) {
 /*
  * STEP 2.2 - Extract virus reads
  */
-process EXTRACT_KRAKEN2_VIRUS {
-    tag "$name"
-    label
+    if (params.virus) {
+        process EXTRACT_KRAKEN2_VIRUS {
+            tag "$name"
+            label
+            
+            input:
+            tuple val(name), file(reads) from trimmed_paired
+            file(report) from kraken2_reports
+            file(output) from kraken2_outputs
+
+            output:
+            tuple val(filename), file("*_virus.fastq") into virus_reads
+
+            script:
+            read = params.single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+            filename = "${name}_virus"
+            """
+            extract_kraken_reads.py \\
+            --kraken-file ${output} \\
+            --report-file ${report} \\
+            --taxid 10239 \\
+            ${read} \\
+            --output ${filename}.fastq
+            """
+        }
+    } else {
+        virus_reads = Channel.empty()
+    }
+
+
+    /*
+    * STEP 2.3 - Extract bacterial reads
+    */
+    if (params.bacteria) {
+    process EXTRACT_KRAKEN2_BACTERIA {
+        tag "$name"
+        label
+        
+        input:
+        tuple val(name), file(reads) from trimmed_paired
+        file(report) from kraken2_reports
+        file(output) from kraken2_outputs
+
+        output:
+        tuple val(filename), file("*_bacteria.fastq") into bacteria_reads
+
+        script:
+        read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        filename = "${name}_bacteria"
+        """
+        extract_kraken_reads.py \\
+        --kraken-file ${output} \\
+        --report-file ${report} \\
+        --taxid 2 \\
+        ${read} \\
+        --output ${filename}.fastq
+        """
+    }
+    } else {
+        bacteria_reads = Channel.empty()
+    }
+
+    /*
+    * STEP 2.4 - Extract fungal reads
+    */
+    if (params.fungi){
+    process EXTRACT_KRAKEN2_FUNGI {
+        tag "$name"
+        label
+
+        input:
+        tuple val(name), file(reads) from trimmed_paired
+        file(report) from kraken2_reports
+        file(output) from kraken2_outputs
+
+        output:
+        tuple val(filename), file("*_fungi.fastq") into fungi_reads
+
+        script:
+        read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        filename = "${name}_fungi"
+        """
+        extract_kraken_reads.py \\
+        --kraken-file ${output} \\
+        --report-file ${report} \\
+        --taxid 4751 \\
+        ${read} \\
+        --output ${filename}.fastq
+        """
+    }
+    } else {
+        fungi_reads = Channel.empty()
+    }
+
+    /*
+    * STEP 3.0 - Mapping
+    */
+    process MAPPING_METASPADES {
+        tag "$name"
+        label
+
+        input:
+        tuple val(name), file(seq_reads) from virus_reads.concat(fungi_reads, bacteria_reads, unclassified_reads)
+
+
+        output:
+        tuple val(name), file("metaspades_result/contigs.fasta") into mapping
+
+        script:
+        read = params.single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+
+        """
+        spades.py \\
+        $read \\
+        --threads $task.cpus \\
+        -o ${name}
+        """
+    }
+
+    /*
+    * STEP 3.1 - Mapping virus 
+    */
+    process MAPPING_METASPADES {
+        tag "$name"
+        label
+
+        input:
+        file(virus_read) from virus_reads
+
+        output:
+        tuple val(name), file("metaspades_result/contigs.fasta") into virus_mapping
+
+        script:
+        meta = params.single_end ? "" : "--meta"
+        read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        name = "${virus_read.baseName}_virus"
+
+        """
+        spades.py \\
+        $meta \\
+        --threads $task.cpus \\
+        $virus_read \\
+        -o metaspades_result
+        """
+    }
+    if (!params.virus){
+        virus_mapping = Channel.create()
+    } 
+
+    /*
+    * STEP 3.2 - Mapping bacteria
+    */
+    process BACTERIA_MAPPING_METASPADES {
+
+        tag "$name"
+        label
+
+        input:
+        file(bacteria_read) from bacteria_reads
+
+        output:
+        tuple val(name),file("metaspades_result/contigs.fasta") into bacteria_mapping
+
+        when:
+        
+
+        script:
+        meta = params.single_end ? "" : "--meta"
+        read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        name = "${bacteria_read.baseName}_bacteria"
+
+        """
+        spades.py \\
+        $meta \\
+        --threads $task.cpus \\
+        $bacteria_read \\
+        -o metaspades_result
+        """
+    }
+
+    if (!params.bacteria){
+        bacteria_mapping = Channel.create()
+    } 
+
+    /*
+    * STEP 3.3 - Mapping fungi
+    */
+    process FUNGI_MAPPING_METASPADES {
+        tag "$name"
+        label
+
+
+        input:
+        file(fungi_read) from fungi_reads
+
+        output:
+        tuple val(name), file("metaspades_result/contigs.fasta") into fungi_mapping
+
     
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-    file(report) from kraken2_reports
-    file(output) from kraken2_outputs
+        script:
+        meta = params.single_end ? "" : "--meta"
+        read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        name = "${fungi_read.baseName}_fungi"
 
-    output:
-    file "*_virus.fastq" into virus_reads
+        """
+        spades.py \\
+        $meta \\
+        --threads $task.cpus \\
+        $reads \\
+        -o metaspades_result
+        """
+    }
 
-    script:
-    read = params.single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+    if (!params.fungi){
+        fungi_mapping = Channel.create()
+    }
 
-    """
-    extract_kraken_reads.py \\
-    --kraken-file ${output} \\
-    --report-file ${report} \\
-    --taxid 10239 \\
-    ${read} \\
-    --output ${name}_virus.fastq
-    """
-}
+    /*
+    * STEP 3.4 - Mapping unkwnown
+    */
 
-/*
- * STEP 2.3 - Extract bacterial reads
- */
-process EXTRACT_KRAKEN2_BACTERIA {
-    tag "$name"
-    label
+    process UNCLASS_MAPPING_METASPADES {
+        tag "$name"
+        label
+
+        input:
+        file(unclass_reads) from unclassified_reads
+
+        output:
+        tuple val(name), file("metaspades_result/contigs.fasta") into unclassified_mapping
     
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-    file(report) from kraken2_reports
-    file(output) from kraken2_outputs
-
-    output:
-    file "*_bacteria.fastq" into bacteria_reads
-
-    script:
-    read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-
-    """
-    extract_kraken_reads.py \\
-    --kraken-file ${output} \\
-    --report-file ${report} \\
-    --taxid 2 \\
-    ${read} \\
-    --output ${name}_bacteria.fastq
-    """
-}
-
-/*
- * STEP 2.4 - Extract fungal reads
- */
-process EXTRACT_KRAKEN2_FUNGI {
-    tag "$name"
-    label
-
-    input:
-    tuple val(name), file(reads) from trimmed_paired
-    file(report) from kraken2_reports
-    file(output) from kraken2_outputs
-
-    output:
-    file "*_fungi.fastq" into fungi_reads
-
-    script:
-    read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-
-    """
-    extract_kraken_reads.py \\
-    --kraken-file ${output} \\
-    --report-file ${report} \\
-    --taxid 4751 \\
-    ${read} \\
-    --output ${name}_fungi.fastq
-    """
-}
- 
-/*
- * STEP 3.1 - Mapping virus 
- */
-process VIRUS_MAPPING_METASPADES {
-    tag "$name"
-    label
-
-    input:
-    file(virus_read) from virus_reads
-
-    output:
-    tuple val(name), file("metaspades_result/contigs.fasta") into virus_mapping
-
-    script:
-    meta = params.single_end ? "" : "--meta"
-    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${virus_read.baseName}
-
-    """
-    spades.py \\
-    $meta \\
-    --threads $task.cpus \\
-    $virus_read \\
-    -o metaspades_result
-    """
-}
-
-/*
- * STEP 3.2 - Mapping bacteria
- */
-process BACTERIA_MAPPING_METASPADES {
-    tag "$name"
-    label
-
-    input:
-    file(bacteria_read) from bacteria_reads
-
-    output:
-    tuple val(name),file("metaspades_result/contigs.fasta") into bacteria_mapping 
-
-    script:
-    meta = params.single_end ? "" : "--meta"
-    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${bacteria_read.baseName}
-
-    """
-    spades.py \\
-    $meta \\
-    --threads $task.cpus \\
-    $bacteria_read \\
-    -o metaspades_result
-    """
-}
-
-/*
- * STEP 3.3 - Mapping fungi
- */
-process FUNGI_MAPPING_METASPADES {
-    tag "$name"
-    label
-
-    input:
-    file(fungi_read) from fungi_reads
-
-    output:
-    tuple val(name), file("metaspades_result/contigs.fasta") into fungi_mapping
- 
-    script:
-    meta = params.single_end ? "" : "--meta"
-    read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
-    name = ${fungi_read.baseName}
-
-    """
-    spades.py \\
-    $meta \\
-    --threads $task.cpus \\
-    $reads \\
-    -o metaspades_result
-    """
-}
-
-/*
- * STEP 3.4 - Evaluating virus assembly
- */
-process QUAST_EVALUATION_VIRUS {
-    tag "$name"
-    label
-
-    input:
-    tuple val(name), file(contig) from virus_mapping
-
-    output:
-    file "/quast_results/report.html" into quast_results_virus
-
-    script:
-    """
-    metaquast.py \\
-    -f $contigs \\
-    -o quast_results
-    """
-}
-
-/*
- * STEP 3.5 - Evaluating bacteria assembly
- */
-process QUAST_EVALUATION_VIRUS {
-    tag "$name"
-    label
-
-    input:
-    tuple val(name), file(contig) from bacteria_mapping
-
-    output:
-    file "/quast_results/report.html" into quast_results_bacteria
+        script:
+        meta = params.single_end ? "" : "--meta"
+        read = params.single_end ? "--s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        name = "${unclass_read.baseName}"
+        """
+        spades.py \\
+        $meta \\
+        --threads $task.cpus \\
+        $reads \\
+        -o metaspades_result
+        """
+    }
+
+    /*
+    * STEP 3.5 - Evaluating assembly
+    */
+    process QUAST_EVALUATION {
+        tag "$name"
+        label
+
+        input:
+        tuple val(name), file(contig) from virus_mapping.concat( bacteria_mapping, fungi_mapping, unclassified_mapping )
+
+        output:
+        file "/quast_results/report.html" into quast_results
+
+        script:
+        """
+        metaquast.py \\
+        -f $contigs \\
+        -o quast_results
+        """
+    }
 
-    script:
-    """
-    metaquast.py \\
-    -f $contigs \\
-    -o quast_results
-    """
-}
+    /*
+    * STEP 4 - Contig 
+    */
 
-/*contigkaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
+    process KAIJU {
+        tag "$name"
+        label
 
- * STEP 3.6 - Evaluating fungi assembly
- */
-process QUAST_EVALUATION_VIRUS {
-    tag "$name"
-    label
+        input:
+        tuple val(name), file(contig) from virus_mapping.concat( bacteria_mapping, fungi_mapping, unclassified_mapping )
+        tuple path(fmi), path(nodes), path(names) from kaiju_db_files
 
-    input:
-    tuple val(name), file(contig) from fungi_mapping
-kaiju2table -t nodes.dmp -n names.dmp -r genus -o kaiju_summary.tsv kaiju.out [kaiju2.out, ...]
+        output:
 
-    output:
-    file "/quast_results/report.html" into quast_results_fungi
 
-    script:
-    """
-    metaquast.py \\
-    -f $contigs \\
-    -o quast_results
-    """
-}
+        script:
+        """
+        kaiju \\
+        -t nodes.dmp \\
+        -f ${fmi} \\
+        -i ${contig} \\
+        -o ${name}_kaiju.out \\
+        -z $task.cpus \\
+        -v
+        """
 
-/*
 
-kaiju \\
--t nodes.dmp \\
--f kaiju_db.fmi \\
--i {reads[0]} \\
--j {reads[1]} \\
--o kaiju.out \\
--z $task.cpus \\
--v
 
-kaiju2table \\
--t nodes.dmp \\
--n names.dmp \\
--r genus/superkingdom (superkingdom parece que no está, F) \\
--o kaiju_summary.tsv \\
-kaiju.out
 
-kaiju
+    }
 
-kaiju-addTaxonNames 
--t nodes.dmp 
--n names.dmp 
--i kaiju.out 
--o kaiju.names.out
+    kaiju \\
+    -t nodes.dmp \\
+    -f kaiju_db.fmi \\
+    -i {reads[0]} \\
+    -j {reads[1]} \\
+    -o kaiju.out \\
+    -z $task.cpus \\
+    -v
 
+    kaiju2table \\
+    -t nodes.dmp \\
+    -n names.dmp \\
+    -r genus/superkingdom (superkingdom parece que no está, F) \\
+    -o kaiju_summary.tsv \\
+    kaiju.out
 
-kaiju2krona -t nodes.dmp -n names.dmp -i kaiju.out -o kaiju.out.krona
+    kaiju-addTaxonNames 
+    -t nodes.dmp 
+    -n names.dmp 
+    -i kaiju.out 
+    -o kaiju.names.out
 
 
+    kaiju2krona
+    -t nodes.dmp 
+    -n names.dmp 
+    -i kaiju.out 
+    -o kaiju.out.krona
 
-*/
+    /*
+    * STEP 4.1 - Bacteria BlastN
+    */
+    process BACTERIA_BLASTN {
 
-/*
- * STEP 4.1 - Bacteria BlastN
- */
-process BACTERIA_BLASTN {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 4.2 - Virus BlastN
+    */
+    process VIRUS_BLASTN {
 
-/*
- * STEP 4.2 - Virus BlastN
- */
-process VIRUS_BLASTN {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 4.3 - Fungi BlastN
+    */
+    process FUNGI_BLASTN {
 
-/*
- * STEP 4.3 - Fungi BlastN
- */
-process FUNGI_BLASTN {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
 
+    /*
+    * STEP 5.1 - Remapping for bacteria
+    */
+    process BACTERIA_REMAPPING {
 
-/*
- * STEP 5.1 - Remapping for bacteria
- */
-process BACTERIA_REMAPPING {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 5.2 - Remapping for virus
+    */
+    process VIRUS_REMAPPING {
 
-/*
- * STEP 5.2 - Remapping for virus
- */
-process VIRUS_REMAPPING {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 5.3 - Remapping for fungi
+    */
+    process FUNGI_REMAPPING {
 
-/*
- * STEP 5.3 - Remapping for fungi
- */
-process FUNGI_REMAPPING {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 6.1 - Coverage and graphs for bacteria
+    */
+    process COVERAGE_BACTERIA {
 
-/*
- * STEP 6.1 - Coverage and graphs for bacteria
- */
-process COVERAGE_BACTERIA {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 6.2 - Coverage and graphs for virus
+    */
+    process COVERAGE_VIRUS {
 
-/*
- * STEP 6.2 - Coverage and graphs for virus
- */
-process COVERAGE_VIRUS {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 6.3 - Coverage and graphs for fungi
+    */
+    process COVERAGE_FUNGI {
 
-/*
- * STEP 6.3 - Coverage and graphs for fungi
- */
-process COVERAGE_FUNGI {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 7 - Generate output in HTML, and tsv table for all results
+    */
+    process HTML_TSV_GENERATION {
 
-/*
- * STEP 7 - Generate output in HTML, and tsv table for all results
- */
-process HTML_TSV_GENERATION {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
+    }
 
-}
+    /*
+    * STEP 8 - Cleanup 
+    */
+    process CLEANUP {
 
-/*
-* STEP 8 - Cleanup 
-*/
-process CLEANUP {
+        input:
 
-    input:
+        output:
 
-    output:
+        script:
 
-    script:
-
-}
+    }
 
 /*
  * STEP 9 - Completion e-mail notification - Courtesy of nf-core
