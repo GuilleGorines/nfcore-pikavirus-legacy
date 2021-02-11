@@ -357,6 +357,7 @@ process SCOUT_KRAKEN2 {
     --output ${name}.kraken \\
     --unclassified-out ${filename}.fastq \\
     ${reads}
+
     """
 }
 
@@ -424,6 +425,7 @@ if (!params.skip_assembly) {
     } else {
         virus_reads = Channel.empty()
     }
+
 
     /*
     * STEP 2.3 - Extract bacterial reads
@@ -498,6 +500,7 @@ if (!params.skip_assembly) {
 
         input:
         tuple val(name), file(seq_reads) from virus_reads.concat(fungi_reads, bacteria_reads, unclassified_reads)
+
 
         output:
         tuple val(name), file("metaspades_result/contigs.fasta") into mapping
@@ -584,6 +587,7 @@ if (!params.skip_assembly) {
     process FUNGI_MAPPING_METASPADES {
         tag "$name"
         label
+
 
         input:
         file(fungi_read) from fungi_reads
