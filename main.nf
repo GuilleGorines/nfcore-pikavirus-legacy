@@ -197,7 +197,8 @@ process GET_SOFTWARE_VERSION {
     echo $workflow.nextflow.version > v_nextflow.txt
     fastqc --version > v_fastqc.txt
     kraken2 --version > v_kraken2.txt
-    blastn -version > v_blastn.txt
+    trimmomatic -version > v_trimmomatic.txt
+    kaiju -help > v_kaiju.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
