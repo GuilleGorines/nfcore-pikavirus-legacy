@@ -117,3 +117,9 @@ In addition, references of tools and data used in this pipeline are as follows:
 > _Bioinformatics_ Volume 29, Issue 8, 15 April 2013, Pages 1072–1075. doi [10.1093/bioinformatics/btt086](https://doi.org/10.1093/bioinformatics/btt086)
 >
 
+>**Bioconda: sustainable and comprehensive software distribution for the life sciences**
+>
+> Björn Grüning, Ryan Dale, Andreas Sjödin, Brad A. Chapman, Jillian Rowe, Christopher H. Tomkins-Tinch, Renan Valieris, Johannes Köster & The Bioconda Team
+>
+> _Nature Methods_ volume 15, pages475–476(2018). doi [10.1038/s41592-018-0046-7](https://doi.org/10.1038/s41592-018-0046-7)
+>
