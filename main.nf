@@ -164,11 +164,7 @@ Channel.from(summary.collect{ [it.key, it.value] })
     id: 'nf-core-pikavirus-summary'
     description: " - this information is collected when the pipeline is started."
     section_name: 'nf-core/pikavirus Workflow Summary'
-    section_href: 'https://github.com/ads $task.cpus \\
-            --unclassified-out $unclassified \\
-            --classified-out $classified \\
-            --report ${sample}.kraken2.report.txt \\
-            --report-zero-counts \\nf-core/pikavirus'
+    section_href: 'https://github.com/nf-core/pikavirus'
     plot_type: 'html'
     data: |
         <dl class=\"dl-horizontal\">
@@ -668,7 +664,7 @@ if (!params.skip_assembly) {
 
     process KAIJU {
         tag "$name"
-        label
+        label "process_high"
 
         input:
         tuple val(name), file(contig) from virus_mapping.concat( bacteria_mapping, fungi_mapping, unclassified_mapping )
