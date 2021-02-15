@@ -35,7 +35,7 @@ def helpMessage() {
       --trimming [bool]               Perform initial trimming of lower-quality sections (Default: true)
       --kraken2_db [path]             Kraken database for taxa identification (Default: hosted on Zenodo)
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: false)
-      --kaiju_db [path]               Kaiju database for contig identification (Default: )
+      --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
       --bacteria [bool]               Search for bacteria (Default: true)
       --fungi [bool]                  Search for fungi (Default: true)
@@ -60,7 +60,7 @@ def helpMessage() {
 
 // Show help message
 if (params.help) {
-    helpMessage()
+    helpMessage()test
     exit 0
 }
 
@@ -248,7 +248,7 @@ if (params.kaiju_db.endswith('.gz') || params.kaiju_db.endswith('.tar')){
         """
     }
 } else {
-    kaiju_db_files = 
+    kaiju_db_files = params.kaiju_db
 }
 
 
@@ -508,7 +508,7 @@ if (!params.skip_assembly) {
         script:
         read = params.single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
 
-        """
+        """696, column 1
         spades.py \\
         $read \\
         --threads $task.cpus \\
@@ -692,7 +692,7 @@ if (!params.skip_assembly) {
 
 
     }
-
+/*
     kaiju \\
     -t nodes.dmp \\
     -f kaiju_db.fmi \\
@@ -722,6 +722,7 @@ if (!params.skip_assembly) {
     -i kaiju.out 
     -o kaiju.out.krona
 
+
     /*
     * STEP 4.1 - Bacteria BlastN
     */
@@ -737,7 +738,8 @@ if (!params.skip_assembly) {
 
     /*
     * STEP 4.2 - Virus BlastN
-    */
+    */ */
+
     process VIRUS_BLASTN {
 
         input:
