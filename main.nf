@@ -207,7 +207,7 @@ process GET_SOFTWARE_VERSION {
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
-if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endswith('.tar')){
+if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endsWith('.tar')){
 
     process UNCOMPRESS_KRAKEN2DB {
         label 'error_retry'
@@ -229,7 +229,7 @@ if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endswith('.tar')){
     kraken2_db_files = params.kraken2_db
 }
 
-if (params.kaiju_db.endswith('.gz') || params.kaiju_db.endswith('.tar')){
+if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
 
     process UNCOMPRESS_KAIJUDB {
         label 'error_retry'
@@ -867,6 +867,7 @@ if (!params.skip_assembly) {
         script:
 
     }
+}
 
 /*
  * STEP 9 - Completion e-mail notification - Courtesy of nf-core
