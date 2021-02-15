@@ -244,7 +244,7 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
         kaijudb = database.toString() - ".tar.gz"
 
         """
-        tar -xvf $database
+        tar -xf $database $kaijudb
         """
     }
 } else {
@@ -280,9 +280,9 @@ process RAW_SAMPLES_FASTQC {
  * STEP 1.2 - TRIMMING
  */
 if (params.trimming) {
-    process RAW_SAMPLES_TRIMMING_TRIMMOMATIC {
+    process TRIMMOMATIC {
         tag "$name"
-        label 
+        label ""
         publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
         saveAs: { filename ->
                         filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
@@ -307,7 +307,7 @@ if (params.trimming) {
     */
     process TRIMMED_SAMPLES_FASTQC {
         tag "$name"
-        label 
+        label "process_medium"
         publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
         input:
@@ -329,7 +329,8 @@ if (params.trimming) {
  */
 process SCOUT_KRAKEN2 {
     tag "$name"
-    label
+    label "process_high"
+
     publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
     saveAs: { filename ->
                       filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
@@ -357,7 +358,6 @@ process SCOUT_KRAKEN2 {
     --output ${name}.kraken \\
     --unclassified-out ${filename}.fastq \\
     ${reads}
-
     """
 }
 
@@ -368,7 +368,7 @@ if (params.kraken2krona) {
 
     process KRONA_KRAKEN_RESULTS {
         tag "$name"
-        label
+        label "process_medium"
         publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
         saveAs: {}
 
@@ -400,7 +400,7 @@ if (!params.skip_assembly) {
     if (params.virus) {
         process EXTRACT_KRAKEN2_VIRUS {
             tag "$name"
-            label
+            label "process_medium"
             
             input:
             tuple val(name), file(reads) from trimmed_paired
@@ -433,7 +433,7 @@ if (!params.skip_assembly) {
     if (params.bacteria) {
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$name"
-        label
+        label "process_medium"
         
         input:
         tuple val(name), file(reads) from trimmed_paired
@@ -465,7 +465,7 @@ if (!params.skip_assembly) {
     if (params.fungi){
     process EXTRACT_KRAKEN2_FUNGI {
         tag "$name"
-        label
+        label "process_medium"
 
         input:
         tuple val(name), file(reads) from trimmed_paired
@@ -496,7 +496,7 @@ if (!params.skip_assembly) {
     */
     process MAPPING_METASPADES {
         tag "$name"
-        label
+        label "process_high"
 
         input:
         tuple val(name), file(seq_reads) from virus_reads.concat(fungi_reads, bacteria_reads, unclassified_reads)
@@ -521,7 +521,7 @@ if (!params.skip_assembly) {
     */
     process MAPPING_METASPADES {
         tag "$name"
-        label
+        label "process_high"
 
         input:
         file(virus_read) from virus_reads
@@ -552,7 +552,7 @@ if (!params.skip_assembly) {
     process BACTERIA_MAPPING_METASPADES {
 
         tag "$name"
-        label
+        label "process_high"
 
         input:
         file(bacteria_read) from bacteria_reads
@@ -586,7 +586,7 @@ if (!params.skip_assembly) {
     */
     process FUNGI_MAPPING_METASPADES {
         tag "$name"
-        label
+        label "process_high"
 
 
         input:
@@ -620,7 +620,7 @@ if (!params.skip_assembly) {
 
     process UNCLASS_MAPPING_METASPADES {
         tag "$name"
-        label
+        label "process_high"
 
         input:
         file(unclass_reads) from unclassified_reads
@@ -646,7 +646,7 @@ if (!params.skip_assembly) {
     */
     process QUAST_EVALUATION {
         tag "$name"
-        label
+        label "process_medium"
 
         input:
         tuple val(name), file(contig) from virus_mapping.concat( bacteria_mapping, fungi_mapping, unclassified_mapping )
