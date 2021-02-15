@@ -103,5 +103,17 @@ In addition, references of tools and data used in this pipeline are as follows:
 > _Bioinformatics_ 2014 Aug 1. doi: [10.1093/bioinformatics/btu170](https://doi.org/10.1093/bioinformatics/btu170)
 >
 
+>**Fast and sensitive taxonomic classification for metagenomics with Kaiju**
+>
+> Peter Menzel, Kim Lee Ng & Anders Krogh
+>
+> _Nature Communications_ volume 7, Article number: 11257 (2016). doi [10.1038/ncomms11257](https://doi.org/10.1038/ncomms11257)
+>
 
+>**QUAST: quality assessment tool for genome assemblies**
+>
+> Alexey Gurevich, Vladislav Saveliev, Nikolay Vyahhi & Glenn Tesler 
+>
+> _Bioinformatics_ Volume 29, Issue 8, 15 April 2013, Pages 1072–1075. doi [10.1093/bioinformatics/btt086](https://doi.org/10.1093/bioinformatics/btt086)
+>
 
