@@ -100,7 +100,7 @@ In addition, references of tools and data used in this pipeline are as follows:
 >
 > Anthony M. Bolger, Marc Lohse & Bjoern Usadel.
 >
-> _Bioinformatics_ 2014 Aug 1. doi: [10.1093/bioinformatics/btu170](https://doi.org/10.1093/bioinformatics/btu170)
+> _Bioinformatics_ Volume 30, Issue 15, 1 August 2014, Pages 2114–2120. doi: [10.1093/bioinformatics/btu170](https://doi.org/10.1093/bioinformatics/btu170)
 >
 
 >**Fast and sensitive taxonomic classification for metagenomics with Kaiju**
