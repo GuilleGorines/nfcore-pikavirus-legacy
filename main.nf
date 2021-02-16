@@ -101,19 +101,19 @@ if (params.input_paths) {
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads }
+            .into { raw_reads, raw_reads_fastqc }
     } else {
         Channel
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads }
+            .into { raw_reads, raw_reads_fastqc }
     }
 } else {
     Channel
         .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
         .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { raw_reads }
+        .into { raw_reads, raw_reads_fastqc }
 }
 
 // Header log info
@@ -260,7 +260,7 @@ process RAW_SAMPLES_FASTQC {
                 }
 
     input:
-    set val(name), file(reads) from raw_reads
+    set val(name), file(reads) from raw_reads_fastqc
 
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
@@ -337,7 +337,7 @@ process SCOUT_KRAKEN2 {
     tuple val(name), file(reads) from trimmed_paired
 
     output:
-    file "*.report" into kraken2_reports
+    file "*.report" into kraken2_reports_krona
     file "*.kraken" into kraken2_outputs
     file "*.krona.html" into krona_taxonomy
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
@@ -369,7 +369,7 @@ if (params.kraken2krona) {
         saveAs: {}
 
         input:
-        file(report) from kraken2_reports
+        file(report) from kraken2_reports_krona
 
         output:
         file "*.krona.html" into krona_taxonomy
