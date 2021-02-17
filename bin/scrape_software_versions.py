@@ -17,7 +17,6 @@ results = OrderedDict()
 results["nf-core/pikavirus"] = '<span style="color:#999999;">N/A</span>'
 results["Nextflow"] = '<span style="color:#999999;">N/A</span>'
 results["FastQC"] = '<span style="color:#999999;">N/A</span>'
-results["MultiQC"] = '<span style="color:#999999;">N/A</span>'
 results["Trimmomatic"] = '<span style="color:#999999;">N/A</span>'
 results["Kraken2"] = '<span style="color:#999999;">N/A</span>'
 results["Kaiju"] = '<span style="color:#999999;">N/A</span>'
