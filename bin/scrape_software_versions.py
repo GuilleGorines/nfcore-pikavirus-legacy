@@ -7,10 +7,10 @@ import re
 regexes = {
     "nf-core/pikavirus": ["v_pipeline.txt", r"(\S+)"],
     "Nextflow": ["v_nextflow.txt", r"(\S+)"],
-    "FastQC": ["v_fastqc.txt", r"FastQC version (\S+)"],
+    "FastQC": ["v_fastqc.txt", r"FastQC v(\S+)"],
     "MultiQC": ["v_multiqc.txt", r"multiqc version (\S+)"],
-    "Trimmomatic": ["v_trimmomatic.txt",r"Trimmomatic version (\S+)"],
-    "Kraken2": ["v_kraken2.txt", r"Kraken2 version (\S+)"],
+    "Trimmomatic": ["v_trimmomatic.txt",r"(\S+)"],
+    "Kraken2": ["v_kraken2.txt", r"Kraken\sversion\s(\S+)"],
     "Kaiju": ["v_kaiju.txt", r"Kaiju version (\S+)"]
 }
 
