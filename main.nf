@@ -198,7 +198,7 @@ process get_software_versions {
     fastqc --version > v_fastqc.txt
     kraken2 --version > v_kraken2.txt
     trimmomatic -version > v_trimmomatic.txt
-    kaiju -help > v_kaiju.txt
+    kaiju -help 2>&1 | head -n 1 > v_kaiju.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
