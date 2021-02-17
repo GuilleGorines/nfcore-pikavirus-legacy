@@ -11,6 +11,7 @@ regexes = {
     "MultiQC": ["v_multiqc.txt", r"multiqc version (\S+)"],
     "Trimmomatic": ["v_trimmomatic.txt",r"Trimmomatic version (\S+)"],
     "Kraken2": ["v_kraken2.txt", r"Kraken2 version (\S+)"],
+    "Kaiju": ["v_kaiju.txt", r"Kaiju version (\S+)"]
 }
 
 results = OrderedDict()
@@ -20,6 +21,7 @@ results["FastQC"] = '<span style="color:#999999;">N/A</span>'
 results["MultiQC"] = '<span style="color:#999999;">N/A</span>'
 results["Trimmomatic"] = '<span style="color:#999999;">N/A</span>'
 results["Kraken2"] = '<span style="color:#999999;">N/A</span>'
+results["Kaiju"] = '<span style="color:#999999;">N/A</span>'
 
 # Search each file using its regex
 for k, v in regexes.items():
