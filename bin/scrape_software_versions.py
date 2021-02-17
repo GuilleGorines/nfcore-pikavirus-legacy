@@ -10,7 +10,7 @@ regexes = {
     "FastQC": ["v_fastqc.txt", r"FastQC v(\S+)"],
     "Trimmomatic": ["v_trimmomatic.txt",r"(\S+)"],
     "Kraken2": ["v_kraken2.txt", r"Kraken\sversion\s(\S+)"],
-    "Kaiju": ["v_kaiju.txt", r"Kaiju version (\S+)"]
+    "Kaiju": ["v_kaiju.txt", r"Kaiju (\S+)"]
 }
 
 results = OrderedDict()
