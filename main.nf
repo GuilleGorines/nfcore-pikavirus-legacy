@@ -101,19 +101,22 @@ if (params.input_paths) {
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_trimmomatic, raw_reads_fastqc }
+            .into { raw_reads_trimmomatic
+                    raw_reads_fastqc }
     } else {
         Channel
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_trimmomatic, raw_reads_fastqc }
+            .into { raw_reads_trimmomatic 
+                    raw_reads_fastqc }
     }
 } else {
     Channel
         .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
         .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { raw_reads_trimmomatic, raw_reads_fastqc }
+        .into { raw_reads_trimmomatic 
+                raw_reads_fastqc }
 }
 
 // Header log info
@@ -513,7 +516,7 @@ if (!params.skip_assembly) {
     }
 
     /*
-    * STEP 3.5 - Evaluating assembly
+    * STEP 3.1 - Evaluating assembly
     */
     process QUAST_EVALUATION {
         tag "$name"
