@@ -291,7 +291,7 @@ if (params.trimming) {
         script:
         paired_end = params.single_end ? "" : "PE"
         """
-        Trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
+        trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
         """
     }
 
