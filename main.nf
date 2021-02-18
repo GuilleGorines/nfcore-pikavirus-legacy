@@ -95,21 +95,21 @@ if (params.input_paths) {
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_trimmomatic
+            .into { raw_reads_compressed
                     raw_reads_fastqc }
     } else {
         Channel
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_trimmomatic 
+            .into { raw_reads_compressed
                     raw_reads_fastqc }
     }
 } else {
     Channel
         .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
         .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { raw_reads_trimmomatic 
+        .into { raw_reads_compressed 
                 raw_reads_fastqc }
 }
 
@@ -222,6 +222,9 @@ if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endsWith('.tar')){
     kraken2_db_files = params.kraken2_db
 }
 
+/*
+ * PREPROCESSING: KAIJU DATABASE
+ */
 if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
 
     process UNCOMPRESS_KAIJUDB {
@@ -243,7 +246,37 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
 } else {
     kaiju_db_files = params.kaiju_db
 }
+/*
+ * PREPROCESSING: FASTQ FILES
+ */
 
+if (params.input_paths.endsWith('.gz') || params.input_paths.endsWith('.tar')){
+    
+    process UNCOMPRESS_SAMPLES {
+        tag 
+        label 'error_retry'
+        
+        input:
+        tuple val(name), file(reads) from raw_reads_compressed
+
+        output:
+        tuple val(name), file("*.fastq") into raw_reads_uncompressed
+        
+        script:
+
+        """
+
+        """
+
+
+
+
+
+    }
+
+}else{
+    raw_reads_uncompressed = params.input_paths
+}
 
 /*
  * STEP 1.1 - FastQC
@@ -282,16 +315,17 @@ if (params.trimming) {
                     }
 
         input:
-        tuple val(name), file(reads) from raw_reads_trimmomatic
+        tuple val(name), file(reads) from raw_reads_uncompressed
 
         output:
-        tuple val(name), file("*_paired.fastq") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
+        tuple val(name), file("*_paired.fastq.tar.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
         tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
 
         script:
-        paired_end = params.single_end ? "" : "PE"
+        paired_end = params.single_end ? "SE" : "PE"
+
         """
-        trimmomatic $paired_end -threads $task.cpus -phred33 $reads 
+        trimmomatic $paired_end -threads $task.cpus -phred33 $reads -baseout $name
         """
     }
 
