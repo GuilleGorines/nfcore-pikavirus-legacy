@@ -253,9 +253,9 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
 if (params.input_paths.endsWith('.gz') || params.input_paths.endsWith('.tar')){
     
     process UNCOMPRESS_SAMPLES {
-        tag 
+        tag $name
         label 'error_retry'
-        
+
         input:
         tuple val(name), file(reads) from raw_reads_compressed
 
@@ -263,15 +263,12 @@ if (params.input_paths.endsWith('.gz') || params.input_paths.endsWith('.tar')){
         tuple val(name), file("*.fastq") into raw_reads_uncompressed
         
         script:
-
+        read1 = params.single_end ? "${reads}" : "${reads[0]}"
+        read2 = params.single_end ? "" : "tar -xf ${reads[1]}"
         """
-
+        tar -xf ${read1}
+        ${read2}
         """
-
-
-
-
-
     }
 
 }else{
