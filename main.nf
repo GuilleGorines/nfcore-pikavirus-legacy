@@ -342,13 +342,25 @@ process SCOUT_KRAKEN2 {
 
     input:
     path(kraken2db) from kraken2_db_files
-    tuple vk
+    tuple val(name), file(reads) from trimmed_paired_kraken2
+
+    output:
+    tuple val(name), file("*.report") into kraken2_reports_krona
+    file "*.report" into kraken2_reports_virus, kraken2_reports_bacteria, kraken2_reports_fungi
+    file "*.kraken" into kraken2_outputs_virus, kraken2_outputs_bacteria, kraken2_outputs_fungi
+    file "*.krona.html" into krona_taxonomy
+    tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
+
+    script:
+    paired_end = params.single_end ? "" : "--paired"
+
+    """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
     --threads $task.cpus \\
     --report ${name}.report \\
     --output ${name}.kraken \\
-    --unclassified-out ${filename}.fastq \\
+    --unclassified-out $${name}_unclassified.fastq \\
     ${reads}
     """
 }
