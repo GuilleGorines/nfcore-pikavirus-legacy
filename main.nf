@@ -95,21 +95,21 @@ if (params.input_paths) {
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_compressed
+            .into { raw_reads
                     raw_reads_fastqc }
     } else {
         Channel
             .from(params.input_paths)
             .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
             .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads_compressed
+            .into { raw_reads
                     raw_reads_fastqc }
     }
 } else {
     Channel
         .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
         .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { raw_reads_compressed 
+        .into { raw_reads 
                 raw_reads_fastqc }
 }
 
@@ -191,7 +191,7 @@ process get_software_versions {
     echo $workflow.nextflow.version > v_nextflow.txt
     fastqc --version > v_fastqc.txt
     kraken2 --version > v_kraken2.txt
-    trimmomatic -version 1>&2 v_trimmomatic.txt
+    fastp -v > v_fastp.txt
     kaiju -help 2>&1 v_kaiju.txt &
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
@@ -275,26 +275,32 @@ process RAW_SAMPLES_FASTQC {
  * STEP 1.2 - TRIMMING
  */
 if (params.trimming) {
-    process TRIMMOMATIC {
+    process FASTP {
         tag "$name"
-        label ""
+        label "process_medium"
         publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
         saveAs: { filename ->
                         filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
                     }
 
         input:
-        tuple val(name), file(reads) from raw_reads_uncompressed
+        tuple val(name), file(reads) from raw_reads
 
         output:
         tuple val(name), file("*_paired.fastq.tar.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
         tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
 
         script:
-        paired_end = params.single_end ? "SE" : "PE"
-
+        detect_adapter =  params.single_end ? "" : "--detect_adapter_for_pe"
+        reads1 = params.single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
+        reads2 = params.single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
         """
-        trimmomatic $paired_end -threads $task.cpus -phred33 $reads -baseout $name
+        fastp $reads1 \\
+        $reads2 \\ 
+        $detect_adapter \\
+        --cut_front \\
+        --cut_tail \\
+        --thread $task.cpus
         """
     }
 

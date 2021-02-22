@@ -8,7 +8,7 @@ regexes = {
     "nf-core/pikavirus": ["v_pipeline.txt", r"(\S+)"],
     "Nextflow": ["v_nextflow.txt", r"(\S+)"],
     "FastQC": ["v_fastqc.txt", r"FastQC v(\S+)"],
-    "Trimmomatic": ["v_trimmomatic.txt",r"(\S+)"],
+    "Fastp": ["v_fastp.txt", r"fastp\s(\S+)"],
     "Kraken2": ["v_kraken2.txt", r"Kraken\sversion\s(\S+)"],
     "Kaiju": ["v_kaiju.txt", r"Kaiju (\S+)"]
 }
@@ -17,7 +17,7 @@ results = OrderedDict()
 results["nf-core/pikavirus"] = '<span style="color:#999999;">N/A</span>'
 results["Nextflow"] = '<span style="color:#999999;">N/A</span>'
 results["FastQC"] = '<span style="color:#999999;">N/A</span>'
-results["Trimmomatic"] = '<span style="color:#999999;">N/A</span>'
+results["FastP"] = '<span style="color:#999999;">N/A</span>'
 results["Kraken2"] = '<span style="color:#999999;">N/A</span>'
 results["Kaiju"] = '<span style="color:#999999;">N/A</span>'
 

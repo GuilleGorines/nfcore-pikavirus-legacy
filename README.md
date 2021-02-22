@@ -96,11 +96,11 @@ In addition, references of tools and data used in this pipeline are as follows:
 > _Genome biology_ 2019 Nov 28. doi: [10.1186/s13059-019-1891-0](https://doi.org/10.1186/s13059-019-1891-0)
 >
 
->**Trimmomatic: a flexible trimmer for Illumina sequence data.**
+>**fastp: an ultra-fast all-in-one FASTQ preprocessor.**
 >
-> Anthony M. Bolger, Marc Lohse & Bjoern Usadel.
->
-> _Bioinformatics_ Volume 30, Issue 15, 1 August 2014, Pages 2114–2120. doi: [10.1093/bioinformatics/btu170](https://doi.org/10.1093/bioinformatics/btu170)
+> Shifu Chen, Yanqing Zhou, Yaru Chen, Jia Gu.
+> 
+> _Bioinformatics_, Volume 34, Issue 17, 01 September 2018, Pages i884–i890,. doi: [10.1093/bioinformatics/bty560](https://doi.org/10.1093/bioinformatics/bty560)
 >
 
 >**Fast and sensitive taxonomic classification for metagenomics with Kaiju**
@@ -123,3 +123,11 @@ In addition, references of tools and data used in this pipeline are as follows:
 >
 > _Nature Methods_ volume 15, pages475–476(2018). doi [10.1038/s41592-018-0046-7](https://doi.org/10.1038/s41592-018-0046-7)
 >
+
+> Fast and sensitive taxonomic classification for metagenomics with Kaiju
+> 
+> Peter Menzel, Kim Lee Ng & Anders Krogh
+> 
+> _Nature Communications_ volume 7, Article number: 11257 (2016). doi [10.1038/ncomms11257](https://doi.org/10.1038/ncomms11257)
+
+
