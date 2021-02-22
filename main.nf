@@ -360,7 +360,7 @@ process SCOUT_KRAKEN2 {
     --threads $task.cpus \\
     --report ${name}.report \\
     --output ${name}.kraken \\
-    --unclassified-out $${name}_unclassified.fastq \\
+    --unclassified-out ${name}_#_unclassified.fastq \\
     ${reads}
     """
 }
