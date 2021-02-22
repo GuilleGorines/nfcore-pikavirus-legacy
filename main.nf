@@ -193,6 +193,7 @@ process get_software_versions {
     kraken2 --version > v_kraken2.txt
     fastp -v > v_fastp.txt
     kaiju -help 2>&1 v_kaiju.txt &
+    bowtie2 --version > v_bowtie2.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
@@ -200,7 +201,7 @@ process get_software_versions {
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
-if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endsWith('.tar')){
+if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
 
     process UNCOMPRESS_KRAKEN2DB {
         label 'error_retry'
@@ -209,13 +210,13 @@ if (params.kraken2_db.endsWith('gz') || params.kraken2_db.endsWith('.tar')){
         path(database) from params.kraken2_db
 
         output:
-        path "$krakendb" into kraken2_db_files
+        path("kraken2db") into kraken2_db_files
 
         script:
-        krakendb = database.toString() - ".tar.gz"
-
+        dbname = "kraken2db"
         """
-        tar -xvf $database
+        mkdir $dbname
+        tar -xvf $database --strip-components 1 -C $dbname
         """
     }
 } else {
@@ -287,20 +288,21 @@ if (params.trimming) {
         tuple val(name), file(reads) from raw_reads
 
         output:
-        tuple val(name), file("*_paired.fastq.tar.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
-        tuple val(name), file("*_unpaired.fastq") into trimmed_unpaired
+        tuple val(name), file("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
+        tuple val(name), file("*fail.fastq.gz") into trimmed_unpaired
 
         script:
         detect_adapter =  params.single_end ? "" : "--detect_adapter_for_pe"
         reads1 = params.single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
         reads2 = params.single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
         """
-        fastp $reads1 \\
-        $reads2 \\ 
+        fastp \\
         $detect_adapter \\
         --cut_front \\
         --cut_tail \\
-        --thread $task.cpus
+        --thread $task.cpus \\
+        $reads1 \\
+        $reads2
         """
     }
 
@@ -340,20 +342,7 @@ process SCOUT_KRAKEN2 {
 
     input:
     path(kraken2db) from kraken2_db_files
-    tuple val(name), file(reads) from trimmed_paired_kraken2
-
-    output:
-    tuple val(name), file("*.report") into kraken2_reports_krona
-    file "*.report" into kraken2_reports_virus, kraken2_reports_bacteria, kraken2_reports_fungi
-    file "*.kraken" into kraken2_outputs_virus, kraken2_outputs_bacteria, kraken2_outputs_fungi
-    file "*.krona.html" into krona_taxonomy
-    tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
-    
-    script:
-    paired_end = params.single_end ? "" : "--paired"
-    filename = "${name}_unclassified"
-
-    """
+    tuple vk
     kraken2 --db $kraken2db \\
     ${paired_end} \\
     --threads $task.cpus \\
