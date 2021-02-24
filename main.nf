@@ -239,7 +239,6 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
 
         script:
         kaijudb = database.toString() - ".tar.gz"
-
         """
         tar -xf $database $kaijudb
         """
@@ -353,7 +352,6 @@ process SCOUT_KRAKEN2 {
 
     script:
     paired_end = params.single_end ? "" : "--paired"
-
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
@@ -533,6 +531,7 @@ if (!params.skip_assembly) {
         file "/quast_results/report.html" into quast_results
 
         script:
+
         """
         metaquast.py \\
         -f $contigs \\
@@ -541,9 +540,8 @@ if (!params.skip_assembly) {
     }
 
     /*
-    * STEP 4 - Contig 
+    * STEP 4 - Contig search with kaiju
     */
-
     process KAIJU {
         tag "$name"
         label "process_high"
@@ -553,9 +551,9 @@ if (!params.skip_assembly) {
         tuple path(fmi), path(nodes), path(names) from kaiju_db_files
 
         output:
-
-
+           
         script:
+
         """
         kaiju \\
         -t nodes.dmp \\
@@ -566,6 +564,47 @@ if (!params.skip_assembly) {
         -v
         """
     }
+
+    process EXTRACT_REFERENCE_FASTA {
+        tag
+        label "process_low"
+
+        input:
+
+
+        output:
+
+
+        script:
+
+        """
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt' > assembly_summary_virus.txt
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
+        # ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt > assembly_summary_protozoa.txt
+        # ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/archaea/assembly_summary.txt > assembly_summary_archaea.txt
+        """
+    }
+
+
+    process BOWTIE2_TO_REFERENCE {
+        tag 
+        label "process_high"
+
+        input:
+
+
+        output:
+
+
+        script:
+
+        """
+        """
+     
+    }
+
+
 }
 
 /*
