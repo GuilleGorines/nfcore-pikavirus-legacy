@@ -10,10 +10,6 @@ with open(krakenrep) as krakenfile:
     krakenfile = [col[4] for col in krakenfile if col[3]=="S"]
     taxid_list = set(krakenfile)
 
-# Output:
-#   0: C(lassified) / U(nclassified)
-#   2: Taxid
-
 # Report:
 #   3: rank code (Unclass, Kingdom...)
 #   4: taxID
@@ -26,13 +22,14 @@ assembly_sum = [col[7], col[6], col[0], col[11], col[4], col[13], col[19] for co
     
 # 0: assembly_accession
 # 4: refseq_category
-# 5: taxid ## EL DE RANGO MÁS BAJO QUE HAYA, STRAIN O SUBESPECIE SI SE PUEDE
-# 6: species_taxid ## LA ESPECIE
+# 5: taxid
+# 6: species_taxid
 # 7: scientific_name 
-# 8: intraespecific_name (strain, breed, ecotype)
-# 11: assembly_level (complete genome, chromosome, scaffold, contig)
-# 13: genome_rep ()
+# 8: intraespecific_name
+# 11: assembly_level 
+# 13: genome_rep
 # 19: url
+# full info: ftp://ftp.ncbi.nlm.nih.gov/genomes/README_assembly_summary.txt
 
 header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", "Assembly_level", "Refseq_category", "Representation", "Assembly_url"]
 assembly_sum.insert(0,header)
