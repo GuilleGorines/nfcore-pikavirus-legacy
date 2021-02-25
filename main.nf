@@ -345,8 +345,9 @@ process SCOUT_KRAKEN2 {
 
     output:
     tuple val(name), file("*.report") into kraken2_reports_krona
-    file "*.report" into kraken2_reports_virus, kraken2_reports_bacteria, kraken2_reports_fungi
-    file "*.kraken" into kraken2_outputs_virus, kraken2_outputs_bacteria, kraken2_outputs_fungi
+    file "*.report" into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
+                         kraken2_reports_virus_references, kraken2_reports_bacteria_references, kraken2_reports_fungi_references
+    file "*.kraken" into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
     file "*.krona.html" into krona_taxonomy
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
 
@@ -405,8 +406,8 @@ if (!params.skip_assembly) {
             
             input:
             tuple val(name), file(reads) from trimmed_paired_extract_virus
-            file(report) from kraken2_reports_virus
-            file(output) from kraken2_outputs_virus
+            file(report) from kraken2_reports_virus_extraction
+            file(output) from kraken2_outputs_virus_extraction
 
             output:
             tuple val(filename), file("*_virus.fastq") into virus_reads
@@ -438,8 +439,8 @@ if (!params.skip_assembly) {
         
         input:
         tuple val(name), file(reads) from trimmed_paired_extract_bacteria
-        file(report) from kraken2_reports_bacteria
-        file(output) from kraken2_outputs_bacteria
+        file(report) from kraken2_reports_bacteria_extraction
+        file(output) from kraken2_outputs_bacteria_extraction
 
         output:
         tuple val(filename), file("*_bacteria.fastq") into bacteria_reads
@@ -470,8 +471,8 @@ if (!params.skip_assembly) {
 
         input:
         tuple val(name), file(reads) from trimmed_paired_extract_fungi
-        file(report) from kraken2_reports_fungi
-        file(output) from kraken2_outputs_fungi
+        file(report) from kraken2_reports_fungi_extraction
+        file(output) from kraken2_outputs_fungi_extraction
 
         output:
         tuple val(filename), file("*_fungi.fastq") into fungi_reads
@@ -565,27 +566,72 @@ if (!params.skip_assembly) {
         """
     }
 
-    process EXTRACT_REFERENCE_FASTA {
-        tag
-        label "process_low"
+    if (params.bacteria) {
+        process EXTRACT_ASSEMBLY_SUMMARY_BACTERIA {
+            label "process_low"
 
-        input:
+            output:
+            file(*.txt) into assembly_summary_bacteria
 
+            script:
 
-        output:
-
-
-        script:
-
-        """
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt' > assembly_summary_virus.txt
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
-        # ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt > assembly_summary_protozoa.txt
-        # ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/archaea/assembly_summary.txt > assembly_summary_archaea.txt
-        """
+            """       
+            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
+            """
+        }
     }
 
+    if (params.virus) {
+        process EXTRACT_ASSEMBLY_SUMMARY_VIRUS {
+            label "process_low"
+
+            output:
+            file(*.txt) into assembly_summary_virus
+
+            script:
+            
+            """       
+            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt' > assembly_summary_virus.txt
+            """
+        }
+    }
+
+    if (params.fungi) {
+        process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
+            label "process_low"
+
+            output:
+            file(*.txt) into assembly_summary_fungi
+
+            script:
+            
+            """       
+            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
+            """
+        }
+
+        process DOWNLOAD_ASSEMBLIES_FUNGI {
+            label "process_low"
+
+            input:
+            file(assemblies) from assembly_summary_fungi
+            file(kraken2_report) from kraken2_report_fungi_references
+
+            output:
+            file(*.)
+
+            script:
+
+            """
+            extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
+            """
+
+
+
+
+
+        }
+    }
 
     process BOWTIE2_TO_REFERENCE {
         tag 
