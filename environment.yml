@@ -19,3 +19,4 @@ dependencies:
   - bioconda::biopython=1.70
   - bioconda::quast=5.0.2
   - bioconda::kaiju=1.7.4
+  - bioconda::bowtie2=2.4.2
