@@ -410,7 +410,7 @@ if (!params.skip_assembly) {
             file(output) from kraken2_outputs_virus_extraction
 
             output:
-            tuple val(filename), file("*_virus.fastq") into virus_reads
+            tuple val(filename), file("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
 
             script:
             read = params.single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
@@ -425,7 +425,9 @@ if (!params.skip_assembly) {
             """
         }
     } else {
-        virus_reads = Channel.empty()
+        virus_reads_assembly = Channel.empty()
+        virus_reads_mapping = Channel.empty()
+
     }
 
 
@@ -443,7 +445,7 @@ if (!params.skip_assembly) {
         file(output) from kraken2_outputs_bacteria_extraction
 
         output:
-        tuple val(filename), file("*_bacteria.fastq") into bacteria_reads
+        tuple val(filename), file("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
 
         script:
         read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
@@ -458,7 +460,8 @@ if (!params.skip_assembly) {
         """
     }
     } else {
-        bacteria_reads = Channel.empty()
+        bacteria_reads_assembly = Channel.empty()
+        bacteria_reads_mapping = Channel.empty()
     }
 
     /*
@@ -475,7 +478,7 @@ if (!params.skip_assembly) {
         file(output) from kraken2_outputs_fungi_extraction
 
         output:
-        tuple val(filename), file("*_fungi.fastq") into fungi_reads
+        tuple val(filename), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
 
         script:
         read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
@@ -490,7 +493,8 @@ if (!params.skip_assembly) {
         """
     }
     } else {
-        fungi_reads = Channel.empty()
+        fungi_reads_assembly = Channel.empty()
+        fungi_reads_mapping = Channel.empty()
     }
 
     /*
@@ -501,7 +505,7 @@ if (!params.skip_assembly) {
         label "process_high"
 
         input:
-        tuple val(name), file(seq_reads) from unclassified_reads.concat(virus_reads, bacteria_reads, fungi_reads )
+        tuple val(name), file(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
 
 
         output:
@@ -623,7 +627,7 @@ if (!params.skip_assembly) {
             file(*_fungi.tsv) into assemblies_data_fungi
 
             script:
-            
+
             """
             extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
             """
@@ -645,25 +649,45 @@ if (!params.skip_assembly) {
             """
         }
 
+        process BOWTIE2_INDEX_BUILD_FUNGI {
+            tag "$basename"
+            label "process_medium"
+
+            input:
+            file(reference) from assemblies_fungi
+
+            output:
+            file(*.ebwt) into indexes_fungi
+
+            script:
+            basename = ${reference}.take(${reference}.lastIndexOf("."))
+            """
+            bowtie2-build $reference $basename
+            """
+        }
+
+        process BOWTIE2_ALIGN_FUNGI {
+            tag "$basename"
+            label "process_high"
+
+            input:
+            file(sequences) from fungi_reads_mapping
+            each index_group from indexes_fungi
+
+            output:
+
+            script:
+            reference = index_group.first()
+            basename = ${reference} - ~[rev]*\.\d*\.ebwt
+            """
+            bowtie2 -x $reference $basename - S 
+
+            # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+
+            """
+        }
+
     }
-
-    process BOWTIE2_TO_REFERENCE {
-        tag 
-        label "process_high"
-
-        input:
-
-
-        output:
-
-
-        script:
-
-        """
-        """
-     
-    }
-
 
 }
 
