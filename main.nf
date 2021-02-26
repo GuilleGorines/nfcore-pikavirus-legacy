@@ -597,6 +597,7 @@ if (!params.skip_assembly) {
     }
 
     if (params.fungi) {
+
         process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
             label "process_low"
 
@@ -610,7 +611,7 @@ if (!params.skip_assembly) {
             """
         }
 
-        process DOWNLOAD_ASSEMBLIES_FUNGI {
+        process GET_ASSEMBLIES_URL_FUNGI {
             label "process_low"
 
             input:
@@ -618,19 +619,32 @@ if (!params.skip_assembly) {
             file(kraken2_report) from kraken2_report_fungi_references
 
             output:
-            file(*.)
+            file(*.sh) into download_instructions_fungi
+            file(*_fungi.tsv) into assemblies_data_fungi
+
+            script:
+            
+            """
+            extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
+            """
+        }
+        
+        process DOWNLOAD_ASSEMBLIES_FUNGI {
+            label "process_low"
+
+            input:
+            file(instructions) from download_instructions_fungi
+
+            output:
+            file(*.fasta) into assemblies_fungi
 
             script:
 
             """
-            extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
+            ./$instructions
             """
-
-
-
-
-
         }
+
     }
 
     process BOWTIE2_TO_REFERENCE {

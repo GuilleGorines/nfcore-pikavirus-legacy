@@ -19,7 +19,8 @@ with open(krakenrep) as krakenfile:
 with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
-assembly_sum = [col[7], col[6], col[0], col[11], col[4], col[13], col[19] for col in krakenfile if col[6] in taxid_list]
+assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list]
+raw_assembly = [[col[0],col[6]] for col in assembly_sum]
     
 # 0: assembly_accession
 # 4: refseq_category
@@ -39,3 +40,9 @@ namefile = f"chosen_assemblies_data_{name_end}.tsv"
 with open(namefile, "w") as chosen_assemblies:
     chosen_assemblies_tsv = csv.writer(chosen_assemblies, delimiter = "\t")
     chosen_assemblies_tsv.writerow(assembly_sum)
+
+namefile = f"url_download_{name_end}.sh"
+with open(url_file,"w") as url_command_file:
+    url_command_file.write(f'#/bin/bash \n')
+    for sci_name,url in raw_assembly:
+        url_command_file.write(f"curl ${url} > ${sci_name}_{name_end}.fasta \n")
