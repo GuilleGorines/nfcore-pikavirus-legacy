@@ -654,7 +654,7 @@ if (!params.skip_assembly) {
             label "process_medium"
 
             input:
-            file(reference) from assemblies_fungi
+            val(basename), file(reference) from assemblies_fungi
 
             output:
             file(*.ebwt) into indexes_fungi
@@ -671,16 +671,15 @@ if (!params.skip_assembly) {
             label "process_high"
 
             input:
-            file(sequences) from fungi_reads_mapping
+            tuple val(reference), file(indexes) from fungi_reads_mapping
             each index_group from indexes_fungi
 
             output:
 
             script:
-            reference = index_group.first()
-            basename = ${reference} - ~[rev]*\.\d*\.ebwt
+           
             """
-            bowtie2 -x $reference $basename - S 
+            bowtie2 -x $reference $indexes - S 
 
             # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
 
