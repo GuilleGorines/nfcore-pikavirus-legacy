@@ -602,6 +602,7 @@ if (!params.skip_assembly) {
 
     if (params.fungi) {
 
+
         process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
             label "process_low"
 
@@ -614,6 +615,24 @@ if (!params.skip_assembly) {
             curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
             """
         }
+
+        process INDIVIDUALIZE_FUNGI_READS {
+
+            input:
+            file(reads) from 
+
+            output:
+            file(*_1.fasta), file(*_2.fasta) into individualized_fungi_reads
+
+            script:
+            first_reads = params.single_end ? ${reads} : ${reads[0]}
+            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+            """
+            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+            $second_reads
+            """
+        }
+
 
         process GET_ASSEMBLIES_URL_FUNGI {
             label "process_low"
@@ -654,10 +673,10 @@ if (!params.skip_assembly) {
             label "process_medium"
 
             input:
-            val(basename), file(reference) from assemblies_fungi
+            file(reference) from assemblies_fungi
 
             output:
-            file(*.ebwt) into indexes_fungi
+            val(basename), file(*.ebwt) into indexes_fungi
 
             script:
             basename = ${reference}.take(${reference}.lastIndexOf("."))
@@ -671,15 +690,16 @@ if (!params.skip_assembly) {
             label "process_high"
 
             input:
-            tuple val(reference), file(indexes) from fungi_reads_mapping
-            each index_group from indexes_fungi
+            tuple val(basename), file(indexes) from indexes_fungi
+            each file(individualized_read) from individualized_fungi_reads
 
             output:
 
             script:
-           
+            sam_name = "${individualized_read}_vs_${basename}.sam"
+
             """
-            bowtie2 -x $reference $indexes - S 
+            bowtie2 -x $basename -S $sam_name
 
             # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
 
