@@ -619,16 +619,16 @@ if (!params.skip_assembly) {
         process INDIVIDUALIZE_FUNGI_READS {
 
             input:
-            file(reads) from 
+            file(reads) from fungi_reads_mapping
 
             output:
-            file(*_1.fasta), file(*_2.fasta) into individualized_fungi_reads
+            file(*_fungi_read_*.fasta) into individualized_fungi_reads
 
             script:
             first_reads = params.single_end ? ${reads} : ${reads[0]}
-            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"%i_fungi_read_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
             """
-            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("%i_fungi_read_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
             $second_reads
             """
         }
