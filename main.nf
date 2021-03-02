@@ -889,8 +889,8 @@ if (!params.skip_assembly) {
         }
 
     }
-
 }
+
 
 /*
  * STEP 9 - Completion e-mail notification - Courtesy of nf-core
@@ -1010,40 +1010,6 @@ workflow.onComplete {
     }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 // nf-core functions

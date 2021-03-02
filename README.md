@@ -33,10 +33,8 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 
 4. Start running your own analysis!
 
-    <!-- TODO nf-core: Update the example "typical command" below used to run the pipeline -->
-
     ```bash
-    nextflow run nf-core/pikavirus -profile <docker/singularity/podman/conda/institute> --input '*_R{1,2}.fastq.gz' --genome GRCh37
+    nextflow run nf-core/pikavirus -profile <docker/singularity/podman/conda> --input '*_R{1,2}.fastq.gz'
     ```
 
 See [usage docs](https://nf-co.re/pikavirus/usage) for all of the available options when running the pipeline.
@@ -45,12 +43,12 @@ See [usage docs](https://nf-co.re/pikavirus/usage) for all of the available opti
 
 By default, the pipeline currently performs the following:
 
-<!-- TODO nf-core: Fill in short bullet-pointed list of default steps of pipeline -->
 
 * Sequencing quality control (`FastQC`)
-* Trimming of low-quality regions in the reads (`Trimmomatic`)
-* Identification and elimination of reads from the host (`Kraken 2`)
-* Overall pipeline run summaries (`MultiQC`)
+* Trimming of low-quality regions in the reads (`FastP`)
+* Identification and elimination of reads from the host, and isolation of viral, bacterial, fungal and unknown reads (`Kraken2`)
+* Assembly of unknow reads (`MetaQuast`) and mapping against databases (`Kaiju`) to identify new possible pathogens
+* Alignment of viral, bacterial and fungal reads against reference genomes to ensure the presence of certain organisms (`Bowtie2`)
 
 ## Documentation
 
@@ -60,10 +58,9 @@ The nf-core/pikavirus pipeline comes with documentation about the pipeline: [usa
 
 ## Credits
 
-nf-core/pikavirus was originally written by Guillermo Jorge Gorines Cordero.
+nf-core/pikavirus was originally written by Guillermo Jorge Gorines Cordero, under supervision of the BU-ISCIII team in Madrid, Spain.
 
-We thank the following people for their extensive assistance in the development
-of this pipeline:
+We thank the following people for their extensive assistance in the development of this pipeline:
 
 <!-- TODO nf-core: If applicable, make list of people who have also contributed -->
 
