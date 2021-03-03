@@ -537,10 +537,12 @@ process SCOUT_KRAKEN2 {
     tuple val(name), val(single_end), path(reads) from trimmed_paired_kraken2
 
     output:
-    tuple val(name), val(single_end), file("*.report") into kraken2_reports_krona
-    tuple "*.report" into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
-                         kraken2_reports_virus_references, kraken2_reports_bacteria_references, kraken2_reports_fungi_references
-    file "*.kraken" into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
+    tuple val(name), val(single_end), path("*.report") into kraken2_reports_krona
+    path("*.report") into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
+                          kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
+                          
+
+    path("*.kraken") into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
     file "*.krona.html" into krona_taxonomy
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
 
@@ -599,8 +601,8 @@ if (!params.skip_assembly) {
             
             input:
             tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
-            file(report) from kraken2_reports_virus_extraction
-            file(output) from kraken2_outputs_virus_extraction
+            path(report) from kraken2_reports_virus_extraction
+            path(output) from kraken2_outputs_virus_extraction
 
             output:
             tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
@@ -633,12 +635,12 @@ if (!params.skip_assembly) {
         label "process_medium"
         
         input:
-        tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_bacteria
-        file(report) from kraken2_reports_bacteria_extraction
-        file(output) from kraken2_outputs_bacteria_extraction
+        tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_bacteria
+        path(report) from kraken2_reports_bacteria_extraction
+        path(output) from kraken2_outputs_bacteria_extraction
 
         output:
-        tuple val(filename), val(single_end), file("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
+        tuple val(filename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
 
         script:
         read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
@@ -698,7 +700,7 @@ if (!params.skip_assembly) {
         label "process_high"
 
         input:
-        tuple val(name), val(single_end), file(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
+        tuple val(name), val(single_end), path(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
 
 
         output:
@@ -769,7 +771,7 @@ if (!params.skip_assembly) {
             label "process_low"
 
             output:
-            file(*.txt) into assembly_summary_bacteria
+            path(*.txt) into assembly_summary_bacteria
 
             script:
             
@@ -779,12 +781,13 @@ if (!params.skip_assembly) {
         }
 
         process INDIVIDUALIZE_BACTERIA_READS {
+            label "process_low"
 
             input:
-            tuple val(name), val(single_end), file(reads) from bacteria_reads_mapping
+            tuple val(name), val(single_end), path(reads) from bacteria_reads_mapping
 
             output:
-            tuple val(single_end), file(bacteria_read_*_*.fasta) into individualized_bacteria_reads
+            tuple val(single_end), path(bacteria_read_*_*.fasta) into individualized_bacteria_reads
 
             script:
             first_reads = $single_end ? ${reads} : ${reads[0]}
@@ -799,12 +802,12 @@ if (!params.skip_assembly) {
             label "process_low"
 
             input:
-            file(assemblies) from assembly_summary_bacteria
-            file(kraken2_report) from kraken2_report_bacteria_references
+            path(assemblies) from assembly_summary_bacteria
+            path(kraken2_report) from kraken2_report_bacteria_references
 
             output:
-            file(*.sh) into download_instructions_bacteria
-            file(*_bacteria.tsv) into assemblies_data_bacteria
+            path("*.sh)" into download_instructions_bacteria
+            path("*_bacteria.tsv") into assemblies_data_bacteria
 
             script:
 
@@ -875,7 +878,7 @@ if (!params.skip_assembly) {
             label "process_low"
 
             output:
-            file(*.txt) into assembly_summary_virus
+            path(*.txt) into assembly_summary_virus
 
             script:
             
@@ -890,7 +893,7 @@ if (!params.skip_assembly) {
             tuple val(name), val(single_end), file(reads) from virus_reads_mapping
 
             output:
-            file(virus_read_*_*.fasta) into individualized_virus_reads
+            tuple val(single_end), file(virus_read_*_*.fasta) into individualized_virus_reads
 
             script:
             first_reads = $single_end ? ${reads} : ${reads[0]}
@@ -905,12 +908,12 @@ if (!params.skip_assembly) {
             label "process_low"
 
             input:
-            file(assemblies) from assembly_summary_virus
-            file(kraken2_report) from kraken2_report_virus_references
+            path(assemblies) from assembly_summary_virus
+            path(kraken2_report) from kraken2_report_virus_references
 
             output:
-            file(*.sh) into download_instructions_virus
-            file(*_virus.tsv) into assemblies_data_virus
+            path("*.sh") into download_instructions_virus
+            path("*_virus.tsv") into assemblies_data_virus
 
             script:
 
@@ -957,7 +960,7 @@ if (!params.skip_assembly) {
             label "process_high"
 
             input:
-            file(individualized_read) from individualized_virus_reads
+            tuple val(single_end), file(individualized_read) from individualized_virus_reads
             each tuple val(basename), file(indexes) from indexes_virus
 
             output:
@@ -982,7 +985,7 @@ if (!params.skip_assembly) {
             label "process_low"
 
             output:
-            file(*.txt) into assembly_summary_fungi
+            path(*.txt) into assembly_summary_fungi
 
             script:
             
@@ -1012,12 +1015,12 @@ if (!params.skip_assembly) {
             label "process_low"
 
             input:
-            file(assemblies) from assembly_summary_fungi
-            file(kraken2_report) from kraken2_report_fungi_references
+            path(assemblies) from assembly_summary_fungi
+            path(kraken2_report) from kraken2_report_fungi_references
 
             output:
-            file(*.sh) into download_instructions_fungi
-            file(*_fungi.tsv) into assemblies_data_fungi
+            path("*.sh") into download_instructions_fungi
+            path("*_fungi.tsv") into assemblies_data_fungi
 
             script:
 
