@@ -536,23 +536,22 @@ process SCOUT_KRAKEN2 {
     tuple val(name), val(single_end), path(reads) from trimmed_paired_kraken2
 
     output:
-    tuple val(name), val(single_end), path("*.report") into kraken2_reports_krona
-    path("*.report") into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
-                          kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
+    tuple val(name), path("*.report") into kraken2_reports_krona
+    path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
                         
-    path("*.kraken") into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
-    file("*.krona.html") into krona_taxonomy
-    tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
+    tuple path("*.report"), path("*.kraken") into kraken2_virus_extraction, kraken2_bacteria_extraction, kraken2_fungi_extraction
+    tuple val(name), file("*_unclassified.fastq") into unclassified_reads
 
     script:
     paired_end = single_end ? "" : "--paired"
+    unclass_name = single_end ? "${name}_#_unclassified.fastq" : "${name}_unclassified.fastq"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
     --threads $task.cpus \\
     --report ${name}.report \\
     --output ${name}.kraken \\
-    --unclassified-out ${name}_#_unclassified.fastq \\
+    --unclassified-out ${unclass_name} \\
     ${reads}
     """
 }
@@ -598,8 +597,7 @@ if (params.virus) {
         
         input:
         tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
-        path(report) from kraken2_reports_virus_extraction
-        path(output) from kraken2_outputs_virus_extraction
+        tuple path(report), path(output) from kraken2_virus_extraction
 
         output:
         tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
@@ -633,8 +631,7 @@ if (params.bacteria) {
         
         input:
         tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_bacteria
-        path(report) from kraken2_reports_bacteria_extraction
-        path(output) from kraken2_outputs_bacteria_extraction
+        tuple path(report), path(output) from kraken2_bacteria_extraction
 
         output:
         tuple val(filename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
@@ -666,8 +663,7 @@ process EXTRACT_KRAKEN2_FUNGI {
 
     input:
     tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_fungi
-    file(report) from kraken2_reports_fungi_extraction
-    file(output) from kraken2_outputs_fungi_extraction
+    tuple file(report), file(output) from kraken2_fungi_extraction
 
     output:
     tuple val(filename), val(single_end), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
