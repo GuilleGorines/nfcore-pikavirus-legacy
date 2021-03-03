@@ -526,11 +526,6 @@ process SCOUT_KRAKEN2 {
     tag "$name"
     label "process_high"
 
-    publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
-    saveAs: { filename ->
-                      filename.indexOf(".krona") > 0 ? "trimmed/$filename" : "$filename"
-    }
-
     input:
     path(kraken2db) from kraken2_db_files
     tuple val(name), val(single_end), path(reads) from trimmed_paired_kraken2
@@ -540,11 +535,11 @@ process SCOUT_KRAKEN2 {
     path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
                         
     tuple path("*.report"), path("*.kraken") into kraken2_virus_extraction, kraken2_bacteria_extraction, kraken2_fungi_extraction
-    tuple val(name), file("*_unclassified.fastq") into unclassified_reads
+    tuple val(name), val(single_end), file("*_unclassified.fastq") into unclassified_reads
 
     script:
     paired_end = single_end ? "" : "--paired"
-    unclass_name = single_end ? "${name}_#_unclassified.fastq" : "${name}_unclassified.fastq"
+    unclass_name = single_end ? "${name}_unclassified.fastq" : "${name}_#_unclassified.fastq"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
@@ -693,11 +688,11 @@ process MAPPING_METASPADES {
     label "process_high"
 
     input:
-    tuple val(name), val(single_end), path(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
+    tuple val(name), val(single_end), path(reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
 
 
     output:
-    tuple val(name), file("metaspades_result/contigs.fasta") into contigs, contigs_quast
+    tuple val(name), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
     script:
     read = single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
