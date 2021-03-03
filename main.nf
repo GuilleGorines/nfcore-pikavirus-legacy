@@ -89,29 +89,8 @@ if (workflow.profile.contains('awsbatch')) {
 /*
  * Create a channel for input read files
  */
-if (params.input_paths) {
-    if (params.single_end) {
-        Channel
-            .from(params.input_paths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads
-                    raw_reads_fastqc }
-    } else {
-        Channel
-            .from(params.input_paths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { raw_reads
-                    raw_reads_fastqc }
-    }
-} else {
-    Channel
-        .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
-        .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { raw_reads 
-                raw_reads_fastqc }
-}
+
+if (params.input) { ch_input = file(params.input, checkIfExists: true) } else { exit 1, "Samplesheet file (-input) not specified!" }
 
 // Header log info
 log.info nfcoreHeader()
@@ -120,7 +99,6 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Data Type']        = params.single_end ? 'Single-End' : 'Paired-End'
 summary['Trimming']       = params.outdir
 summary['Virus Search']     = params.virus
 summary['Bacteria Search']  = params.bacteria
@@ -197,7 +175,221 @@ process get_software_versions {
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
+/*
+ * PREPROCESSING: Reformat samplesheet and check validity
+ */
+process CHECK_SAMPLESHEET {
+    tag "$samplesheet"
+    publishDir "${params.outdir}/", mode: params.publish_dir_mode,
+        saveAs: { filename ->
+                      if (filename.endsWith(".tsv")) "preprocess/sra/$filename"
+                      else "pipeline_info/$filename"
+                }
 
+    input:
+    path samplesheet from ch_input
+
+    output:
+    path "samplesheet.valid.csv" into ch_samplesheet_reformat
+    path "sra_run_info.tsv" optional true
+
+    script:  // These scripts are bundled with the pipeline, in nf-core/viralrecon/bin/
+    run_sra = !params.skip_sra && !isOffline()
+    """
+    awk -F, '{if(\$1 != "" && \$2 != "") {print \$0}}' $samplesheet > nonsra_id.csv
+    check_samplesheet.py nonsra_id.csv nonsra.samplesheet.csv
+    awk -F, '{if(\$1 != "" && \$2 == "" && \$3 == "") {print \$1}}' $samplesheet > sra_id.list
+    if $run_sra && [ -s sra_id.list ]
+    then
+        fetch_sra_runinfo.py sra_id.list sra_run_info.tsv --platform ILLUMINA --library_layout SINGLE,PAIRED
+        sra_runinfo_to_samplesheet.py sra_run_info.tsv sra.samplesheet.csv
+    fi
+    if [ -f nonsra.samplesheet.csv ]
+    then
+        head -n 1 nonsra.samplesheet.csv > samplesheet.valid.csv
+    else
+        head -n 1 sra.samplesheet.csv > samplesheet.valid.csv
+    fi
+    tail -n +2 -q *sra.samplesheet.csv >> samplesheet.valid.csv
+    """
+}
+
+// Function to get list of [ sample, single_end?, is_sra?, is_ftp?, [ fastq_1, fastq_2 ], [ md5_1, md5_2] ]
+def validate_input(LinkedHashMap sample) {
+    def sample_id = sample.sample_id
+    def single_end = sample.single_end.toBoolean()
+    def is_sra = sample.is_sra.toBoolean()
+    def is_ftp = sample.is_ftp.toBoolean()
+    def fastq_1 = sample.fastq_1
+    def fastq_2 = sample.fastq_2
+    def md5_1 = sample.md5_1
+    def md5_2 = sample.md5_2
+
+    def array = []
+    if (!is_sra) {
+        if (single_end) {
+            array = [ sample_id, single_end, is_sra, is_ftp, [ file(fastq_1, checkIfExists: true) ] ]
+        } else {
+            array = [ sample_id, single_end, is_sra, is_ftp, [ file(fastq_1, checkIfExists: true), file(fastq_2, checkIfExists: true) ] ]
+        }
+    } else {
+        array = [ sample_id, single_end, is_sra, is_ftp, [ fastq_1, fastq_2 ], [ md5_1, md5_2 ] ]
+    }
+
+    return array
+}
+
+/*
+ * Create channels for input fastq files
+ */
+ch_samplesheet_reformat
+    .splitCsv(header:true, sep:',')
+    .map { validate_input(it) }
+    .into { ch_reads_all
+            ch_reads_sra }
+
+
+
+/*
+ * Download and check SRA data
+ */
+if (!params.skip_sra || !isOffline()) {
+    ch_reads_sra
+        .filter { it[2] }
+        .into { ch_reads_sra_ftp
+                ch_reads_sra_dump }
+
+    process SRA_FASTQ_FTP {
+        tag "$sample"
+        label 'process_medium'
+        label 'error_retry'
+        publishDir "${params.outdir}/preprocess/sra", mode: params.publish_dir_mode,
+            saveAs: { filename ->
+                          if (filename.endsWith(".md5")) "md5/$filename"
+                          else params.save_sra_fastq ? filename : null
+                    }
+
+        when:
+        is_ftp
+
+        input:
+        tuple val(sample), val(single_end), val(is_sra), val(is_ftp), val(fastq), val(md5) from ch_reads_sra_ftp
+
+        output:
+        tuple val(sample), val(single_end), val(is_sra), val(is_ftp), path("*.fastq.gz") into ch_sra_fastq_ftp
+        path "*.md5"
+
+        script:
+        if (single_end) {
+            """
+            curl -L ${fastq[0]} -o ${sample}.fastq.gz
+            echo "${md5[0]}  ${sample}.fastq.gz" > ${sample}.fastq.gz.md5
+            md5sum -c ${sample}.fastq.gz.md5
+            """
+        } else {
+            """
+            curl -L ${fastq[0]} -o ${sample}_1.fastq.gz
+            echo "${md5[0]}  ${sample}_1.fastq.gz" > ${sample}_1.fastq.gz.md5
+            md5sum -c ${sample}_1.fastq.gz.md5
+            curl -L ${fastq[1]} -o ${sample}_2.fastq.gz
+            echo "${md5[1]}  ${sample}_2.fastq.gz" > ${sample}_2.fastq.gz.md5
+            md5sum -c ${sample}_2.fastq.gz.md5
+            """
+        }
+    }
+
+    process SRA_FASTQ_DUMP {
+        tag "$sample"
+        label 'process_medium'
+        label 'error_retry'
+        publishDir "${params.outdir}/preprocess/sra", mode: params.publish_dir_mode,
+            saveAs: { filename ->
+                          if (filename.endsWith(".log")) "log/$filename"
+                          else params.save_sra_fastq ? filename : null
+                    }
+
+        when:
+        !is_ftp
+
+        input:
+        tuple val(sample), val(single_end), val(is_sra), val(is_ftp) from ch_reads_sra_dump.map { it[0..3] }
+
+        output:
+        tuple val(sample), val(single_end), val(is_sra), val(is_ftp), path("*.fastq.gz") into ch_sra_fastq_dump
+        path "*.log"
+
+        script:
+        prefix = "${sample.split('_')[0..-2].join('_')}"
+        pe = single_end ? "" : "--readids --split-e"
+        rm_orphan = single_end ? "" : "[ -f  ${prefix}.fastq.gz ] && rm ${prefix}.fastq.gz"
+        """
+        parallel-fastq-dump \\
+            --sra-id $prefix \\
+            --threads $task.cpus \\
+            --outdir ./ \\
+            --tmpdir ./ \\
+            --gzip \\
+            $pe \\
+            > ${prefix}.fastq_dump.log
+        $rm_orphan
+        """
+    }
+
+    ch_reads_all
+        .filter { !it[2] }
+        .concat(ch_sra_fastq_ftp, ch_sra_fastq_dump)
+        .set { ch_reads_all }
+}
+
+ch_reads_all
+    .map { [ it[0].split('_')[0..-2].join('_'), it[1], it[4] ] }
+    .groupTuple(by: [0, 1])
+    .map { [ it[0], it[1], it[2].flatten() ] }
+    .set { ch_reads_all }
+
+
+/*
+ * Merge FastQ files with the same sample identifier (resequenced samples)
+ */
+process CAT_FASTQ {
+    tag "$sample"
+
+    input:
+    tuple val(sample), val(single_end), path(reads) from ch_reads_all
+
+    output:
+    tuple val(sample), val(single_end), path("*.merged.fastq.gz") into ch_cat_fastqc,
+                                                                       ch_cat_fastp
+
+    script:
+    readList = reads.collect{it.toString()}
+    if (!single_end) {
+        if (readList.size > 2) {
+            def read1 = []
+            def read2 = []
+            readList.eachWithIndex{ v, ix -> ( ix & 1 ? read2 : read1 ) << v }
+            """
+            cat ${read1.sort().join(' ')} > ${sample}_1.merged.fastq.gz
+            cat ${read2.sort().join(' ')} > ${sample}_2.merged.fastq.gz
+            """
+        } else {
+            """
+            ln -s ${reads[0]} ${sample}_1.merged.fastq.gz
+            ln -s ${reads[1]} ${sample}_2.merged.fastq.gz
+            """
+        }
+    } else {
+        if (readList.size > 1) {
+            """
+            cat ${readList.sort().join(' ')} > ${sample}.merged.fastq.gz
+            """
+        } else {
+            """
+            ln -s $reads ${sample}.merged.fastq.gz
+            """
+        }
+    }
+}
 /*
  * PREPROCESSING: KRAKEN2 DATABASE
  */
@@ -259,7 +451,7 @@ process RAW_SAMPLES_FASTQC {
                 }
 
     input:
-    set val(name), file(reads) from raw_reads_fastqc
+    set val(name), val(single_end), path(reads) from ch_cat_fastqc
 
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
@@ -267,7 +459,7 @@ process RAW_SAMPLES_FASTQC {
     script:
 
     """
-    fastqc --quiet --threads $task.cpus $reads
+    fastqc --quiet --threads $task.cpus *.fastq.gz
     """
 }
 
@@ -284,16 +476,17 @@ if (params.trimming) {
                     }
 
         input:
-        tuple val(name), file(reads) from raw_reads
+        tuple val(name), val(single_end), path(reads) from ch_cat_fastp
 
         output:
-        tuple val(name), file("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
-        tuple val(name), file("*fail.fastq.gz") into trimmed_unpaired
+        tuple val(name), val(single_end), path("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
+        tuple val(name), val(single_end), path("*fail.fastq.gz") into trimmed_unpaired
 
         script:
-        detect_adapter =  params.single_end ? "" : "--detect_adapter_for_pe"
-        reads1 = params.single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
-        reads2 = params.single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
+        detect_adapter =  $single_end ? "" : "--detect_adapter_for_pe"
+        reads1 = $single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
+        reads2 = $single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
+        
         """
         fastp \\
         $detect_adapter \\
@@ -314,7 +507,7 @@ if (params.trimming) {
         publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
         input:
-        tuple val(name), file(reads) from trimmed_paired_fastqc
+        tuple val(name), val(single_end), path(reads) from trimmed_paired_fastqc
 
         output:
         file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
@@ -341,18 +534,18 @@ process SCOUT_KRAKEN2 {
 
     input:
     path(kraken2db) from kraken2_db_files
-    tuple val(name), file(reads) from trimmed_paired_kraken2
+    tuple val(name), val(single_end), path(reads) from trimmed_paired_kraken2
 
     output:
-    tuple val(name), file("*.report") into kraken2_reports_krona
-    file "*.report" into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
+    tuple val(name), val(single_end), file("*.report") into kraken2_reports_krona
+    tuple "*.report" into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
                          kraken2_reports_virus_references, kraken2_reports_bacteria_references, kraken2_reports_fungi_references
     file "*.kraken" into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
     file "*.krona.html" into krona_taxonomy
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
 
     script:
-    paired_end = params.single_end ? "" : "--paired"
+    paired_end = $single_end ? "" : "--paired"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
@@ -376,7 +569,7 @@ if (params.kraken2krona) {
         saveAs: {}
 
         input:
-        tuple val(name), file(report) from kraken2_reports_krona
+        tuple val(name), path(report) from kraken2_reports_krona
 
         output:
         file "*.krona.html" into krona_taxonomy
@@ -405,15 +598,15 @@ if (!params.skip_assembly) {
             label "process_medium"
             
             input:
-            tuple val(name), file(reads) from trimmed_paired_extract_virus
+            tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
             file(report) from kraken2_reports_virus_extraction
             file(output) from kraken2_outputs_virus_extraction
 
             output:
-            tuple val(filename), file("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
+            tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
 
             script:
-            read = params.single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+            read = $single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
             filename = "${name}_virus"
             """
             extract_kraken_reads.py \\
@@ -440,15 +633,15 @@ if (!params.skip_assembly) {
         label "process_medium"
         
         input:
-        tuple val(name), file(reads) from trimmed_paired_extract_bacteria
+        tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_bacteria
         file(report) from kraken2_reports_bacteria_extraction
         file(output) from kraken2_outputs_bacteria_extraction
 
         output:
-        tuple val(filename), file("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
+        tuple val(filename), val(single_end), file("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
 
         script:
-        read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
         filename = "${name}_bacteria"
         """
         extract_kraken_reads.py \\
@@ -473,7 +666,7 @@ if (!params.skip_assembly) {
         label "process_medium"
 
         input:
-        tuple val(name), file(reads) from trimmed_paired_extract_fungi
+        tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_fungi
         file(report) from kraken2_reports_fungi_extraction
         file(output) from kraken2_outputs_fungi_extraction
 
@@ -481,7 +674,7 @@ if (!params.skip_assembly) {
         tuple val(filename), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
 
         script:
-        read = params.single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
         filename = "${name}_fungi"
         """
         extract_kraken_reads.py \\
@@ -505,14 +698,14 @@ if (!params.skip_assembly) {
         label "process_high"
 
         input:
-        tuple val(name), file(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
+        tuple val(name), val(single_end), file(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
 
 
         output:
         tuple val(name), file("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
         script:
-        read = params.single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+        read = $single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
 
         """
         spades.py \\
@@ -588,14 +781,14 @@ if (!params.skip_assembly) {
         process INDIVIDUALIZE_BACTERIA_READS {
 
             input:
-            file(reads) from bacteria_reads_mapping
+            tuple val(name), val(single_end), file(reads) from bacteria_reads_mapping
 
             output:
-            file(bacteria_read_*_*.fasta) into individualized_bacteria_reads
+            tuple val(single_end), file(bacteria_read_*_*.fasta) into individualized_bacteria_reads
 
             script:
-            first_reads = params.single_end ? ${reads} : ${reads[0]}
-            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+            first_reads = $single_end ? ${reads} : ${reads[0]}
+            second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
             """
             awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("bacteria_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
             $second_reads
@@ -649,7 +842,7 @@ if (!params.skip_assembly) {
             script:
             basename = ${reference}.take(${reference}.lastIndexOf("."))
             """
-            bowtie2-build $reference $basename
+            bowtie2-build --seed 1 --threads $task.cpus $reference $basename
             """
         }
 
@@ -658,14 +851,14 @@ if (!params.skip_assembly) {
             label "process_high"
 
             input:
-            file(individualized_read) from individualized_bacteria_reads
+            tuple val(single_end), file(individualized_read) from individualized_bacteria_reads
             each tuple val(basename), file(indexes) from indexes_bacteria
 
             output:
 
             script:
-            readname = params.single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = params.single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+            readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+            sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
             sam_name = "${readname}_vs_${basename}.sam"
 
             """
@@ -694,14 +887,14 @@ if (!params.skip_assembly) {
         process INDIVIDUALIZE_VIRUS_READS {
 
             input:
-            file(reads) from virus_reads_mapping
+            tuple val(name), val(single_end), file(reads) from virus_reads_mapping
 
             output:
             file(virus_read_*_*.fasta) into individualized_virus_reads
 
             script:
-            first_reads = params.single_end ? ${reads} : ${reads[0]}
-            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+            first_reads = $single_end ? ${reads} : ${reads[0]}
+            second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
             """
             awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
             $second_reads
@@ -770,8 +963,8 @@ if (!params.skip_assembly) {
             output:
 
             script:
-            readname = params.single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = params.single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+            readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+            sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
             sam_name = "${readname}_vs_${basename}.sam"
 
             """
@@ -807,8 +1000,8 @@ if (!params.skip_assembly) {
             file(fungi_read_*_*.fasta) into individualized_fungi_reads
 
             script:
-            first_reads = params.single_end ? ${reads} : ${reads[0]}
-            second_reads = params.single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+            first_reads = single_end ? ${reads} : ${reads[0]}
+            second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
             """
             awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
             $second_reads
@@ -877,8 +1070,8 @@ if (!params.skip_assembly) {
             output:
 
             script:
-            readname = params.single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = params.single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+            readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+            sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
             sam_name = "${readname}_vs_${basename}.sam"
 
             """
