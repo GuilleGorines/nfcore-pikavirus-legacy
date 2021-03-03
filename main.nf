@@ -31,7 +31,6 @@ def helpMessage() {
       --max_time [int].h              Maximum time for the pipeline to finish
 
     Options:
-      --single_end [bool]             Specifies that the input is single-end reads (Default: false)
       --trimming [bool]               Perform initial trimming of lower-quality sections (Default: true)
       --kraken2_db [path]             Kraken database for taxa identification (Default: hosted on Zenodo)
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: false)
@@ -539,11 +538,10 @@ process SCOUT_KRAKEN2 {
     output:
     tuple val(name), val(single_end), path("*.report") into kraken2_reports_krona
     path("*.report") into kraken2_reports_virus_extraction, kraken2_reports_bacteria_extraction, kraken2_reports_fungi_extraction,
-                          kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
-                          
-
+                          kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
+                        
     path("*.kraken") into kraken2_outputs_virus_extraction, kraken2_outputs_bacteria_extraction, kraken2_outputs_fungi_extraction
-    file "*.krona.html" into krona_taxonomy
+    file("*.krona.html") into krona_taxonomy
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
 
     script:
@@ -574,7 +572,7 @@ if (params.kraken2krona) {
         tuple val(name), path(report) from kraken2_reports_krona
 
         output:
-        file "*.krona.html" into krona_taxonomy
+        file("*.krona.html") into krona_taxonomy
 
         script:
 
@@ -590,46 +588,45 @@ if (params.kraken2krona) {
     }
 }
 
-if (!params.skip_assembly) {
 /*
  * STEP 2.2 - Extract virus reads
  */
-    if (params.virus) {
-        process EXTRACT_KRAKEN2_VIRUS {
-            tag "$name"
-            label "process_medium"
-            
-            input:
-            tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
-            path(report) from kraken2_reports_virus_extraction
-            path(output) from kraken2_outputs_virus_extraction
+if (params.virus) {
+    process EXTRACT_KRAKEN2_VIRUS {
+        tag "$name"
+        label "process_medium"
+        
+        input:
+        tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
+        path(report) from kraken2_reports_virus_extraction
+        path(output) from kraken2_outputs_virus_extraction
 
-            output:
-            tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
+        output:
+        tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
 
-            script:
-            read = $single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-            filename = "${name}_virus"
-            """
-            extract_kraken_reads.py \\
-            --kraken-file ${output} \\
-            --report-file ${report} \\
-            --taxid 10239 \\
-            ${read} \\
-            --output ${filename}.fastq
-            """
-        }
-    } else {
-        virus_reads_assembly = Channel.empty()
-        virus_reads_mapping = Channel.empty()
-
+        script:
+        read = $single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+        filename = "${name}_virus"
+        """
+        extract_kraken_reads.py \\
+        --kraken-file ${output} \\
+        --report-file ${report} \\
+        --taxid 10239 \\
+        ${read} \\
+        --output ${filename}.fastq
+        """
     }
+} else {
+    virus_reads_assembly = Channel.empty()
+    virus_reads_mapping = Channel.empty()
+
+}
 
 
-    /*
-    * STEP 2.3 - Extract bacterial reads
-    */
-    if (params.bacteria) {
+/*
+* STEP 2.3 - Extract bacterial reads
+*/
+if (params.bacteria) {
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$name"
         label "process_medium"
@@ -654,437 +651,439 @@ if (!params.skip_assembly) {
         --output ${filename}.fastq
         """
     }
-    } else {
+} else {
         bacteria_reads_assembly = Channel.empty()
         bacteria_reads_mapping = Channel.empty()
     }
 
-    /*
-    * STEP 2.4 - Extract fungal reads
-    */
-    if (params.fungi){
-    process EXTRACT_KRAKEN2_FUNGI {
-        tag "$name"
+/*
+* STEP 2.4 - Extract fungal reads
+*/
+if (params.fungi){
+process EXTRACT_KRAKEN2_FUNGI {
+    tag "$name"
+    label "process_medium"
+
+    input:
+    tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_fungi
+    file(report) from kraken2_reports_fungi_extraction
+    file(output) from kraken2_outputs_fungi_extraction
+
+    output:
+    tuple val(filename), val(single_end), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
+
+    script:
+    read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+    filename = "${name}_fungi"
+    """
+    extract_kraken_reads.py \\
+    --kraken-file ${output} \\
+    --report-file ${report} \\
+    --taxid 4751 \\
+    ${read} \\
+    --output ${filename}.fastq
+    """
+}
+} else {
+    fungi_reads_assembly = Channel.empty()
+    fungi_reads_mapping = Channel.empty()
+}
+
+/*
+* STEP 3.0 - Mapping
+*/
+process MAPPING_METASPADES {
+    tag "$name"
+    label "process_high"
+
+    input:
+    tuple val(name), val(single_end), path(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
+
+
+    output:
+    tuple val(name), file("metaspades_result/contigs.fasta") into contigs, contigs_quast
+
+    script:
+    read = $single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+
+    """
+    spades.py \\
+    $read \\
+    --threads $task.cpus \\
+    -o ${name}
+    """
+}
+
+/*
+* STEP 3.1 - Evaluating assembly
+*/
+process QUAST_EVALUATION {
+    tag "$name"
+    label "process_medium"
+
+    input:
+    tuple val(name), file(contig) from contigs_quast
+
+    output:
+    file "/quast_results/report.html" into quast_results
+
+    script:
+
+    """
+    metaquast.py \\
+    -f $contigs \\
+    -o quast_results
+    """
+}
+
+/*
+* STEP 4 - Contig search with kaiju
+*/
+process KAIJU {
+    tag "$name"
+    label "process_high"
+
+    input:
+    tuple val(name), file(contig) from contigs
+    tuple path(fmi), path(nodes), path(names) from kaiju_db_files
+
+    output:
+        
+    script:
+
+    """
+    kaiju \\
+    -t nodes.dmp \\
+    -f ${fmi} \\
+    -i ${contig} \\
+    -o ${name}_kaiju.out \\
+    -z $task.cpus \\
+    -v
+    """
+}
+
+if (params.bacteria) {
+
+
+    process INDIVIDUALIZE_BACTERIA_READS {
+        label "process_low"
+
+        input:
+        tuple val(name), val(single_end), path(reads) from bacteria_reads_mapping
+
+        output:
+        tuple val(single_end), path("bacteria_read_*_*.fasta") into individualized_bacteria_reads
+
+        script:
+        first_reads = $single_end ? ${reads} : ${reads[0]}
+        second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        """
+        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("bacteria_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+        $second_reads
+        """
+    }
+
+    process EXTRACT_ASSEMBLY_SUMMARY_BACTERIA {
+        label "process_low"
+
+        output:
+        path("*.txt") into assembly_summary_bacteria
+
+        script:
+        
+        """       
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
+        """
+    }
+
+
+    process GET_ASSEMBLIES_URL_BACTERIA {
+        label "process_low"
+
+        input:
+        path(assemblies) from assembly_summary_bacteria
+        path(kraken2_report) from kraken2_report_bacteria_references
+
+        output:
+        path("*.sh") into download_instructions_bacteria
+        path("*_bacteria.tsv") into assemblies_data_bacteria
+
+        script:
+
+        """
+        extract_reference_assemblies.py ${kraken2_report} ${assemblies} bacteria
+        """
+    }
+    
+    process DOWNLOAD_ASSEMBLIES_BACTERIA {
+        label "process_low"
+
+        input:
+        path(instructions) from download_instructions_bacteria
+
+        output:
+        tuple val(sciname),path("*.fasta") into assemblies_bacteria
+
+        script:
+        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
+        """
+        ./$instructions
+        """
+    }
+
+    process BOWTIE2_INDEX_BUILD_BACTERIA {
+        tag "$basename"
         label "process_medium"
 
         input:
-        tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_fungi
-        file(report) from kraken2_reports_fungi_extraction
-        file(output) from kraken2_outputs_fungi_extraction
+        tuple val(sciname), file(fasta) from assemblies_bacteria
 
         output:
-        tuple val(filename), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
+        tuple val(sciname), path("Bowtie2Index") into indexes_bacteria
 
         script:
-        read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        filename = "${name}_fungi"
         """
-        extract_kraken_reads.py \\
-        --kraken-file ${output} \\
-        --report-file ${report} \\
-        --taxid 4751 \\
-        ${read} \\
-        --output ${filename}.fastq
+        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
+        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
         """
-    }
-    } else {
-        fungi_reads_assembly = Channel.empty()
-        fungi_reads_mapping = Channel.empty()
     }
 
-    /*
-    * STEP 3.0 - Mapping
-    */
-    process MAPPING_METASPADES {
-        tag "$name"
+    process BOWTIE2_ALIGN_BACTERIA {
+        tag "$basename"
         label "process_high"
 
         input:
-        tuple val(name), val(single_end), path(seq_reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
-
+        tuple val(single_end), path(individualized_read) from individualized_bacteria_reads
+        each tuple val(sciname), path(indexes) from indexes_bacteria
 
         output:
-        tuple val(name), file("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
         script:
-        read = $single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+        readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+        sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+        sam_name = "${readname}_vs_${sciname}.sam"
 
         """
-        spades.py \\
-        $read \\
-        --threads $task.cpus \\
-        -o ${name}
+        bowtie2 \\
+        -x ${indexes}/${sciname} \\
+        -S $sam_name
+
+        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+        """
+    }
+}
+
+if (params.virus) {
+
+    process EXTRACT_ASSEMBLY_SUMMARY_VIRUS {
+        label "process_low"
+
+        output:
+        path("*.txt") into assembly_summary_virus
+
+        script:
+        
+        """       
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/virus/assembly_summary.txt' > assembly_summary_virus.txt
         """
     }
 
-    /*
-    * STEP 3.1 - Evaluating assembly
-    */
-    process QUAST_EVALUATION {
-        tag "$name"
+    process INDIVIDUALIZE_VIRUS_READS {
+
+        input:
+        tuple val(name), val(single_end), path(reads) from virus_reads_mapping
+
+        output:
+        tuple val(single_end), path("virus_read_*_*.fasta") into individualized_virus_reads
+
+        script:
+        first_reads = $single_end ? ${reads} : ${reads[0]}
+        second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        """
+        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+        $second_reads
+        """
+    }
+
+    process GET_ASSEMBLIES_URL_VIRUS {
+        label "process_low"
+
+        input:
+        path(assemblies) from assembly_summary_virus
+        path(kraken2_report) from kraken2_report_virus_references
+
+        output:
+        path("*.sh") into download_instructions_virus
+        path("*_virus.tsv") into assemblies_data_virus
+
+        script:
+
+        """
+        extract_reference_assemblies.py ${kraken2_report} ${assemblies} virus
+        """
+    }
+    
+    process DOWNLOAD_ASSEMBLIES_VIRUS {
+        label "process_low"
+
+        input:
+        file(instructions) from download_instructions_virus
+
+        output:
+        file("*.fasta") into assemblies_virus
+
+        script:
+
+        """
+        ./$instructions
+        """
+    }
+
+    process BOWTIE2_INDEX_BUILD_VIRUS {
+        tag "$basename"
         label "process_medium"
 
         input:
-        tuple val(name), file(contig) from contigs_quast
+        file(reference) from assemblies_virus
 
         output:
-        file "/quast_results/report.html" into quast_results
+        val(basename), file("*.ebwt") into indexes_virus
 
         script:
-
         """
-        metaquast.py \\
-        -f $contigs \\
-        -o quast_results
+        bowtie2-build $reference $basename
         """
     }
 
-    /*
-    * STEP 4 - Contig search with kaiju
-    */
-    process KAIJU {
-        tag "$name"
+    process BOWTIE2_ALIGN_VIRUS {
+        tag "$basename"
         label "process_high"
 
         input:
-        tuple val(name), file(contig) from contigs
-        tuple path(fmi), path(nodes), path(names) from kaiju_db_files
+        tuple val(single_end), file(individualized_read) from individualized_virus_reads
+        each tuple val(basename), file(indexes) from indexes_virus
 
         output:
-           
+
+        script:
+        readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+        sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+        sam_name = "${readname}_vs_${basename}.sam"
+
+        """
+        bowtie2 -x $basename $sequence -S $sam_name
+
+        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+        """
+    }
+
+}
+
+if (params.fungi) {
+
+    process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
+        label "process_low"
+
+        output:
+        path("*.txt") into assembly_summary_fungi
+
+        script:
+        
+        """       
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
+        """
+    }
+
+    process INDIVIDUALIZE_FUNGI_READS {
+
+        input:
+        tuple val(name), val(single_end), file(reads) from fungi_reads_mapping
+
+        output:
+        file("fungi_read_*_*.fasta") into individualized_fungi_reads
+
+        script:
+        first_reads = single_end ? ${reads} : ${reads[0]}
+        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        """
+        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+        $second_reads
+        """
+    }
+
+    process GET_ASSEMBLIES_URL_FUNGI {
+        label "process_low"
+
+        input:
+        path(assemblies) from assembly_summary_fungi
+        path(kraken2_report) from kraken2_report_fungi_references
+
+        output:
+        path("*.sh") into download_instructions_fungi
+        path("*_fungi.tsv") into assemblies_data_fungi
+
         script:
 
         """
-        kaiju \\
-        -t nodes.dmp \\
-        -f ${fmi} \\
-        -i ${contig} \\
-        -o ${name}_kaiju.out \\
-        -z $task.cpus \\
-        -v
+        extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
+        """
+    }
+    
+    process DOWNLOAD_ASSEMBLIES_FUNGI {
+        label "process_low"
+
+        input:
+        path(instructions) from download_instructions_fungi
+
+        output:
+        file("*.fasta") into assemblies_fungi
+
+        script:
+
+        """
+        ./$instructions
         """
     }
 
-    if (params.bacteria) {
+    process BOWTIE2_INDEX_BUILD_FUNGI {
+        tag "$basename"
+        label "process_medium"
 
-      process EXTRACT_ASSEMBLY_SUMMARY_BACTERIA {
-            label "process_low"
+        input:
+        file(reference) from assemblies_fungi
 
-            output:
-            path(*.txt) into assembly_summary_bacteria
+        output:
+        val(basename), path("*.ebwt") into indexes_fungi
 
-            script:
-            
-            """       
-            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
-            """
-        }
-
-        process INDIVIDUALIZE_BACTERIA_READS {
-            label "process_low"
-
-            input:
-            tuple val(name), val(single_end), path(reads) from bacteria_reads_mapping
-
-            output:
-            tuple val(single_end), path(bacteria_read_*_*.fasta) into individualized_bacteria_reads
-
-            script:
-            first_reads = $single_end ? ${reads} : ${reads[0]}
-            second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-            """
-            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("bacteria_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-            $second_reads
-            """
-        }
-
-        process GET_ASSEMBLIES_URL_BACTERIA {
-            label "process_low"
-
-            input:
-            path(assemblies) from assembly_summary_bacteria
-            path(kraken2_report) from kraken2_report_bacteria_references
-
-            output:
-            path("*.sh)" into download_instructions_bacteria
-            path("*_bacteria.tsv") into assemblies_data_bacteria
-
-            script:
-
-            """
-            extract_reference_assemblies.py ${kraken2_report} ${assemblies} bacteria
-            """
-        }
-        
-        process DOWNLOAD_ASSEMBLIES_BACTERIA {
-            label "process_low"
-
-            input:
-            file(instructions) from download_instructions_bacteria
-
-            output:
-            file(*.fasta) into assemblies_bacteria
-
-            script:
-
-            """
-            ./$instructions
-            """
-        }
-
-        process BOWTIE2_INDEX_BUILD_BACTERIA {
-            tag "$basename"
-            label "process_medium"
-
-            input:
-            file(reference) from assemblies_bacteria
-
-            output:
-            val(basename), file(*.ebwt) into indexes_bacteria
-
-            script:
-            basename = ${reference}.take(${reference}.lastIndexOf("."))
-            """
-            bowtie2-build --seed 1 --threads $task.cpus $reference $basename
-            """
-        }
-
-        process BOWTIE2_ALIGN_BACTERIA {
-            tag "$basename"
-            label "process_high"
-
-            input:
-            tuple val(single_end), file(individualized_read) from individualized_bacteria_reads
-            each tuple val(basename), file(indexes) from indexes_bacteria
-
-            output:
-
-            script:
-            readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-            sam_name = "${readname}_vs_${basename}.sam"
-
-            """
-            bowtie2 -x $basename $sequence -S $sam_name
-
-            # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
-            """
-        }
+        script:
+        basename = ${reference}.take(${reference}.lastIndexOf("."))
+        """
+        bowtie2-build $reference $basename
+        """
     }
 
-    if (params.virus) {
+    process BOWTIE2_ALIGN_FUNGI {
+        tag "$basename"
+        label "process_high"
 
-        process EXTRACT_ASSEMBLY_SUMMARY_VIRUS {
-            label "process_low"
+        input:
+        file(individualized_read) from individualized_fungi_reads
+        each tuple val(basename), path(indexes) from indexes_fungi
 
-            output:
-            path(*.txt) into assembly_summary_virus
+        output:
 
-            script:
-            
-            """       
-            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/virus/assembly_summary.txt' > assembly_summary_virus.txt
-            """
-        }
+        script:
+        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+        sam_name = "${readname}_vs_${basename}.sam"
 
-        process INDIVIDUALIZE_VIRUS_READS {
+        """
+        bowtie2 -x $basename $sequence -S $sam_name
 
-            input:
-            tuple val(name), val(single_end), file(reads) from virus_reads_mapping
-
-            output:
-            tuple val(single_end), file(virus_read_*_*.fasta) into individualized_virus_reads
-
-            script:
-            first_reads = $single_end ? ${reads} : ${reads[0]}
-            second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-            """
-            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-            $second_reads
-            """
-        }
-
-        process GET_ASSEMBLIES_URL_VIRUS {
-            label "process_low"
-
-            input:
-            path(assemblies) from assembly_summary_virus
-            path(kraken2_report) from kraken2_report_virus_references
-
-            output:
-            path("*.sh") into download_instructions_virus
-            path("*_virus.tsv") into assemblies_data_virus
-
-            script:
-
-            """
-            extract_reference_assemblies.py ${kraken2_report} ${assemblies} virus
-            """
-        }
-        
-        process DOWNLOAD_ASSEMBLIES_VIRUS {
-            label "process_low"
-
-            input:
-            file(instructions) from download_instructions_virus
-
-            output:
-            file(*.fasta) into assemblies_virus
-
-            script:
-
-            """
-            ./$instructions
-            """
-        }
-
-        process BOWTIE2_INDEX_BUILD_VIRUS {
-            tag "$basename"
-            label "process_medium"
-
-            input:
-            file(reference) from assemblies_virus
-
-            output:
-            val(basename), file(*.ebwt) into indexes_virus
-
-            script:
-            basename = ${reference}.take(${reference}.lastIndexOf("."))
-            """
-            bowtie2-build $reference $basename
-            """
-        }
-
-        process BOWTIE2_ALIGN_VIRUS {
-            tag "$basename"
-            label "process_high"
-
-            input:
-            tuple val(single_end), file(individualized_read) from individualized_virus_reads
-            each tuple val(basename), file(indexes) from indexes_virus
-
-            output:
-
-            script:
-            readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-            sam_name = "${readname}_vs_${basename}.sam"
-
-            """
-            bowtie2 -x $basename $sequence -S $sam_name
-
-            # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
-            """
-        }
-
+        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+        """
     }
 
-    if (params.fungi) {
-
-        process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
-            label "process_low"
-
-            output:
-            path(*.txt) into assembly_summary_fungi
-
-            script:
-            
-            """       
-            curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
-            """
-        }
-
-        process INDIVIDUALIZE_FUNGI_READS {
-
-            input:
-            file(reads) from fungi_reads_mapping
-
-            output:
-            file(fungi_read_*_*.fasta) into individualized_fungi_reads
-
-            script:
-            first_reads = single_end ? ${reads} : ${reads[0]}
-            second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-            """
-            awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-            $second_reads
-            """
-        }
-
-        process GET_ASSEMBLIES_URL_FUNGI {
-            label "process_low"
-
-            input:
-            path(assemblies) from assembly_summary_fungi
-            path(kraken2_report) from kraken2_report_fungi_references
-
-            output:
-            path("*.sh") into download_instructions_fungi
-            path("*_fungi.tsv") into assemblies_data_fungi
-
-            script:
-
-            """
-            extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
-            """
-        }
-        
-        process DOWNLOAD_ASSEMBLIES_FUNGI {
-            label "process_low"
-
-            input:
-            file(instructions) from download_instructions_fungi
-
-            output:
-            file(*.fasta) into assemblies_fungi
-
-            script:
-
-            """
-            ./$instructions
-            """
-        }
-
-        process BOWTIE2_INDEX_BUILD_FUNGI {
-            tag "$basename"
-            label "process_medium"
-
-            input:
-            file(reference) from assemblies_fungi
-
-            output:
-            val(basename), file(*.ebwt) into indexes_fungi
-
-            script:
-            basename = ${reference}.take(${reference}.lastIndexOf("."))
-            """
-            bowtie2-build $reference $basename
-            """
-        }
-
-        process BOWTIE2_ALIGN_FUNGI {
-            tag "$basename"
-            label "process_high"
-
-            input:
-            file(individualized_read) from individualized_fungi_reads
-            each tuple val(basename), file(indexes) from indexes_fungi
-
-            output:
-
-            script:
-            readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-            sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-            sam_name = "${readname}_vs_${basename}.sam"
-
-            """
-            bowtie2 -x $basename $sequence -S $sam_name
-
-            # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
-            """
-        }
-
-    }
 }
 
 
