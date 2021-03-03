@@ -482,9 +482,9 @@ if (params.trimming) {
         tuple val(name), val(single_end), path("*fail.fastq.gz") into trimmed_unpaired
 
         script:
-        detect_adapter =  $single_end ? "" : "--detect_adapter_for_pe"
-        reads1 = $single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
-        reads2 = $single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
+        detect_adapter =  single_end ? "" : "--detect_adapter_for_pe"
+        reads1 = single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
+        reads2 = single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
         
         """
         fastp \\
@@ -545,7 +545,7 @@ process SCOUT_KRAKEN2 {
     tuple val(filename), file("*_unclassified.fastq") into unclassified_reads
 
     script:
-    paired_end = $single_end ? "" : "--paired"
+    paired_end = single_end ? "" : "--paired"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
@@ -605,7 +605,7 @@ if (params.virus) {
         tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
 
         script:
-        read = $single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
         filename = "${name}_virus"
         """
         extract_kraken_reads.py \\
@@ -640,7 +640,7 @@ if (params.bacteria) {
         tuple val(filename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
 
         script:
-        read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
         filename = "${name}_bacteria"
         """
         extract_kraken_reads.py \\
@@ -673,7 +673,7 @@ process EXTRACT_KRAKEN2_FUNGI {
     tuple val(filename), val(single_end), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
 
     script:
-    read = $single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+    read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
     filename = "${name}_fungi"
     """
     extract_kraken_reads.py \\
@@ -704,7 +704,7 @@ process MAPPING_METASPADES {
     tuple val(name), file("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
     script:
-    read = $single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
+    read = single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
 
     """
     spades.py \\
@@ -775,8 +775,8 @@ if (params.bacteria) {
         tuple val(single_end), path("bacteria_read_*_*.fasta") into individualized_bacteria_reads
 
         script:
-        first_reads = $single_end ? ${reads} : ${reads[0]}
-        second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        first_reads = single_end ? ${reads} : ${reads[0]}
+        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
         """
         awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("bacteria_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
         $second_reads
@@ -853,14 +853,13 @@ if (params.bacteria) {
         label "process_high"
 
         input:
-        tuple val(single_end), path(individualized_read) from individualized_bacteria_reads
-        each tuple val(sciname), path(indexes) from indexes_bacteria
+        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_bacteria_reads.combine(indexes_bacteria)
 
         output:
 
         script:
-        readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-        sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
         sam_name = "${readname}_vs_${sciname}.sam"
 
         """
@@ -875,6 +874,24 @@ if (params.bacteria) {
 
 if (params.virus) {
 
+    process INDIVIDUALIZE_VIRUS_READS {
+        label "process_low"
+
+        input:
+        tuple val(name), val(single_end), path(reads) from virus_reads_mapping
+
+        output:
+        tuple val(single_end), path("virus_read_*_*.fasta") into individualized_virus_reads
+
+        script:
+        first_reads = single_end ? ${reads} : ${reads[0]}
+        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        """
+        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+        $second_reads
+        """
+    }
+
     process EXTRACT_ASSEMBLY_SUMMARY_VIRUS {
         label "process_low"
 
@@ -884,26 +901,10 @@ if (params.virus) {
         script:
         
         """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/virus/assembly_summary.txt' > assembly_summary_virus.txt
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt' > assembly_summary_virus.txt
         """
     }
 
-    process INDIVIDUALIZE_VIRUS_READS {
-
-        input:
-        tuple val(name), val(single_end), path(reads) from virus_reads_mapping
-
-        output:
-        tuple val(single_end), path("virus_read_*_*.fasta") into individualized_virus_reads
-
-        script:
-        first_reads = $single_end ? ${reads} : ${reads[0]}
-        second_reads = $single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-        """
-        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-        $second_reads
-        """
-    }
 
     process GET_ASSEMBLIES_URL_VIRUS {
         label "process_low"
@@ -927,13 +928,13 @@ if (params.virus) {
         label "process_low"
 
         input:
-        file(instructions) from download_instructions_virus
+        path(instructions) from download_instructions_virus
 
         output:
-        file("*.fasta") into assemblies_virus
+        tuple val(sciname),path("*.fasta") into assemblies_virus
 
         script:
-
+        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
         """
         ./$instructions
         """
@@ -944,14 +945,15 @@ if (params.virus) {
         label "process_medium"
 
         input:
-        file(reference) from assemblies_virus
+        tuple val(sciname), file(fasta) from assemblies_virus
 
         output:
-        val(basename), file("*.ebwt") into indexes_virus
+        tuple val(sciname), path("Bowtie2Index") into indexes_virus
 
         script:
         """
-        bowtie2-build $reference $basename
+        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
+        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
         """
     }
 
@@ -960,26 +962,44 @@ if (params.virus) {
         label "process_high"
 
         input:
-        tuple val(single_end), file(individualized_read) from individualized_virus_reads
-        each tuple val(basename), file(indexes) from indexes_virus
+        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_virus_reads.combine(indexes_virus)
 
         output:
 
         script:
-        readname = $single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-        sequence = $single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-        sam_name = "${readname}_vs_${basename}.sam"
+        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
+        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
+        sam_name = "${readname}_vs_${sciname}.sam"
 
         """
-        bowtie2 -x $basename $sequence -S $sam_name
+        bowtie2 \\
+        -x ${indexes}/${sciname} \\
+        -S $sam_name
 
         # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
         """
     }
-
 }
 
 if (params.fungi) {
+
+    process INDIVIDUALIZE_FUNGI_READS {
+        label "process_low"
+
+        input:
+        tuple val(name), val(single_end), path(reads) from fungi_reads_mapping
+
+        output:
+        tuple val(single_end), path("fungi_read_*_*.fasta") into individualized_fungi_reads
+
+        script:
+        first_reads = single_end ? ${reads} : ${reads[0]}
+        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
+        """
+        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
+        $second_reads
+        """
+    }
 
     process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
         label "process_low"
@@ -994,22 +1014,6 @@ if (params.fungi) {
         """
     }
 
-    process INDIVIDUALIZE_FUNGI_READS {
-
-        input:
-        tuple val(name), val(single_end), file(reads) from fungi_reads_mapping
-
-        output:
-        file("fungi_read_*_*.fasta") into individualized_fungi_reads
-
-        script:
-        first_reads = single_end ? ${reads} : ${reads[0]}
-        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-        """
-        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-        $second_reads
-        """
-    }
 
     process GET_ASSEMBLIES_URL_FUNGI {
         label "process_low"
@@ -1036,10 +1040,10 @@ if (params.fungi) {
         path(instructions) from download_instructions_fungi
 
         output:
-        file("*.fasta") into assemblies_fungi
+        tuple val(sciname),path("*.fasta") into assemblies_fungi
 
         script:
-
+        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
         """
         ./$instructions
         """
@@ -1050,15 +1054,15 @@ if (params.fungi) {
         label "process_medium"
 
         input:
-        file(reference) from assemblies_fungi
+        tuple val(sciname), file(fasta) from assemblies_fungi
 
         output:
-        val(basename), path("*.ebwt") into indexes_fungi
+        tuple val(sciname), path("Bowtie2Index") into indexes_fungi
 
         script:
-        basename = ${reference}.take(${reference}.lastIndexOf("."))
         """
-        bowtie2-build $reference $basename
+        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
+        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
         """
     }
 
@@ -1067,23 +1071,23 @@ if (params.fungi) {
         label "process_high"
 
         input:
-        file(individualized_read) from individualized_fungi_reads
-        each tuple val(basename), path(indexes) from indexes_fungi
+        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_fungi_reads.combine(indexes_fungi)
 
         output:
 
         script:
         readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
         sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-        sam_name = "${readname}_vs_${basename}.sam"
+        sam_name = "${readname}_vs_${sciname}.sam"
 
         """
-        bowtie2 -x $basename $sequence -S $sam_name
+        bowtie2 \\
+        -x ${indexes}/${sciname} \\
+        -S $sam_name
 
         # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
         """
     }
-
 }
 
 
@@ -1251,5 +1255,14 @@ def checkHostname() {
                 }
             }
         }
+    }
+}
+
+def isOffline() {
+    try {
+        return NXF_OFFLINE as Boolean
+    }
+    catch( Exception e ) {
+        return false
     }
 }
