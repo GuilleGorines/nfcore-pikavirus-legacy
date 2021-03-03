@@ -18,7 +18,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run nf-core/pikavirus --input '*_R{1,2}.fastq.gz' -profile docker
+    nextflow run nf-core/pikavirus --input samplesheet.csv -profile docker
 
     Mandatory arguments:
       --input [file]                  Path to input data (must be surrounded with quotes)
