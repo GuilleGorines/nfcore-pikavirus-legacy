@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import csv
 
@@ -20,8 +22,11 @@ with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
 assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list]
+if len(assembly_sum) == 0:
+    sys.exit(1)
+
 raw_assembly = [[col[0],col[6]] for col in assembly_sum]
-    
+
 # 0: assembly_accession
 # 4: refseq_category
 # 5: taxid
@@ -33,6 +38,8 @@ raw_assembly = [[col[0],col[6]] for col in assembly_sum]
 # 19: url
 # full info: ftp://ftp.ncbi.nlm.nih.gov/genomes/README_assembly_summary.txt
 
+
+
 header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", "Assembly_level", "Refseq_category", "Representation", "Assembly_url"]
 assembly_sum.insert(0,header)
 
@@ -41,8 +48,12 @@ with open(namefile, "w") as chosen_assemblies:
     chosen_assemblies_tsv = csv.writer(chosen_assemblies, delimiter = "\t")
     chosen_assemblies_tsv.writerow(assembly_sum)
 
-namefile = f"url_download_{name_end}.sh"
+url_file = f"url_download_{name_end}.sh"
+
 with open(url_file,"w") as url_command_file:
     url_command_file.write(f'#/bin/bash \n')
+
     for sci_name,url in raw_assembly:
-        url_command_file.write(f"curl ${url} > ${sci_name}_{name_end}.fasta \n")
+        filename = url.split("/")[-1]
+        url = f"{url}/{filename}_genomic.fna.gz"
+        url_command_file.write(f"wget --quiet -O {sci_name}_{name_end}.fna.gz {url}\n")

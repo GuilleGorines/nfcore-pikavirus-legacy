@@ -442,7 +442,7 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
  * STEP 1.1 - FastQC
  */
 process RAW_SAMPLES_FASTQC {
-    tag "$name"
+    tag "$samplename"
     label "process_medium"
     publishDir "${params.outdir}/raw_fastqc", mode: params.publish_dir_mode,
         saveAs: { filename ->
@@ -450,7 +450,7 @@ process RAW_SAMPLES_FASTQC {
                 }
 
     input:
-    set val(name), val(single_end), path(reads) from ch_cat_fastqc
+    set val(samplename), val(single_end), path(reads) from ch_cat_fastqc
 
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
@@ -475,16 +475,16 @@ if (params.trimming) {
                     }
 
         input:
-        tuple val(name), val(single_end), path(reads) from ch_cat_fastp
+        tuple val(samplename), val(single_end), path(reads) from ch_cat_fastp
 
         output:
-        tuple val(name), val(single_end), path("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
-        tuple val(name), val(single_end), path("*fail.fastq.gz") into trimmed_unpaired
+        tuple val(samplename), val(single_end), path("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
+        tuple val(samplename), val(single_end), path("*fail.fastq.gz") into trimmed_unpaired
 
         script:
         detect_adapter =  single_end ? "" : "--detect_adapter_for_pe"
-        reads1 = single_end ? "--in1 ${reads} --out1 ${name}_trim.fastq.gz --failed_out ${name}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${name}_1.fastq.gz --unpaired1 ${name}_1_fail.fastq.gz"
-        reads2 = single_end ? "" : "--in2 ${reads[1]} --out2 ${name}_2.fastq.gz --unpaired2 ${name}_2_fail.fastq.gz"
+        reads1 = single_end ? "--in1 ${reads} --out1 ${samplename}_trim.fastq.gz --failed_out ${samplename}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${samplename}_1.fastq.gz --unpaired1 ${samplename}_1_fail.fastq.gz"
+        reads2 = single_end ? "" : "--in2 ${reads[1]} --out2 ${samplename}_2.fastq.gz --unpaired2 ${samplename}_2_fail.fastq.gz"
         
         """
         fastp \\
@@ -501,12 +501,12 @@ if (params.trimming) {
     * STEP 1.3 - FastQC on trimmed reads
     */
     process TRIMMED_SAMPLES_FASTQC {
-        tag "$name"
+        tag "$samplename"
         label "process_medium"
         publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
 
         input:
-        tuple val(name), val(single_end), path(reads) from trimmed_paired_fastqc
+        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_fastqc
 
         output:
         file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
@@ -523,29 +523,29 @@ if (params.trimming) {
  * STEP 2.1.1 - Scout with Kraken2
  */
 process SCOUT_KRAKEN2 {
-    tag "$name"
+    tag "$samplename"
     label "process_high"
 
     input:
     path(kraken2db) from kraken2_db_files
-    tuple val(name), val(single_end), path(reads) from trimmed_paired_kraken2
+    tuple val(samplename), val(single_end), path(reads) from trimmed_paired_kraken2
 
     output:
-    tuple val(name), path("*.report") into kraken2_reports_krona
-    path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
+-    tuple val(samplename), path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
+                                                 kraken2_reports_krona
                         
-    tuple path("*.report"), path("*.kraken") into kraken2_virus_extraction, kraken2_bacteria_extraction, kraken2_fungi_extraction
-    tuple val(name), val(single_end), file("*_unclassified.fastq") into unclassified_reads
+    tuple val(samplename), path("*.report"), path("*.kraken") into kraken2_virus_extraction, kraken2_bacteria_extraction, kraken2_fungi_extraction
+    tuple val(samplename), val(single_end), file("*_unclassified.fastq") into unclassified_reads
 
     script:
     paired_end = single_end ? "" : "--paired"
-    unclass_name = single_end ? "${name}_unclassified.fastq" : "${name}_#_unclassified.fastq"
+    unclass_name = single_end ? "${samplename}_unclassified.fastq" : "${samplename}_#_unclassified.fastq"
     """
     kraken2 --db $kraken2db \\
     ${paired_end} \\
     --threads $task.cpus \\
-    --report ${name}.report \\
-    --output ${name}.kraken \\
+    --report ${samplename}.report \\
+    --output ${samplename}.kraken \\
     --unclassified-out ${unclass_name} \\
     ${reads}
     """
@@ -557,13 +557,13 @@ process SCOUT_KRAKEN2 {
 if (params.kraken2krona) {
 
     process KRONA_KRAKEN_RESULTS {
-        tag "$name"
+        tag "$samplename"
         label "process_medium"
         publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
         saveAs: {}
 
         input:
-        tuple val(name), path(report) from kraken2_reports_krona
+        tuple val(samplename), path(report) from kraken2_reports_krona
 
         output:
         file("*.krona.html") into krona_taxonomy
@@ -573,11 +573,11 @@ if (params.kraken2krona) {
         """
         kreport2krona.py \\
         --report-file $report \\
-        --output ${name}.krona
+        --output ${samplename}.krona
 
         ktImportText \\
-        -o ${name}.krona.html \\
-        ${name}.krona
+        -o ${samplename}.krona.html \\
+        ${samplename}.krona
         """
     }
 }
@@ -587,26 +587,26 @@ if (params.kraken2krona) {
  */
 if (params.virus) {
     process EXTRACT_KRAKEN2_VIRUS {
-        tag "$name"
+        tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_virus
-        tuple path(report), path(output) from kraken2_virus_extraction
+        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_virus
+        tuple val(samplename), path(report), path(output) from kraken2_virus_extraction
 
         output:
-        tuple val(filename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
+        tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_assembly, virus_reads_mapping
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        filename = "${name}_virus"
+        filename = "${samplename}_virus.fastq"
         """
         extract_kraken_reads.py \\
-        --kraken-file ${output} \\
-        --report-file ${report} \\
+        --kraken-file $output \\
+        --report-file $report \\
         --taxid 10239 \\
-        ${read} \\
-        --output ${filename}.fastq
+        $read \\
+        --output $filename
         """
     }
 } else {
@@ -621,26 +621,26 @@ if (params.virus) {
 */
 if (params.bacteria) {
     process EXTRACT_KRAKEN2_BACTERIA {
-        tag "$name"
+        tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(name), val(single_end), path(reads) from trimmed_paired_extract_bacteria
-        tuple path(report), path(output) from kraken2_bacteria_extraction
+        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_bacteria
+        tuple val(samplename), path(report), path(output) from kraken2_bacteria_extraction
 
         output:
-        tuple val(filename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
+        tuple val(samplename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_assembly, bacteria_reads_mapping
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        filename = "${name}_bacteria"
+        filename = "${samplename}_bacteria.fastq"
         """
         extract_kraken_reads.py \\
         --kraken-file ${output} \\
         --report-file ${report} \\
         --taxid 2 \\
         ${read} \\
-        --output ${filename}.fastq
+        --output ${filename}
         """
     }
 } else {
@@ -653,26 +653,26 @@ if (params.bacteria) {
 */
 if (params.fungi){
 process EXTRACT_KRAKEN2_FUNGI {
-    tag "$name"
+    tag "$samplename"
     label "process_medium"
 
     input:
-    tuple val(name), val(single_end), file(reads) from trimmed_paired_extract_fungi
-    tuple file(report), file(output) from kraken2_fungi_extraction
+    tuple val(samplename), val(single_end), file(reads) from trimmed_paired_extract_fungi
+    tuple val(samplename), file(report), file(output) from kraken2_fungi_extraction
 
     output:
-    tuple val(filename), val(single_end), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
+    tuple val(samplename), val(single_end), file("*_fungi.fastq") into fungi_reads_assembly, fungi_reads_mapping
 
     script:
     read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-    filename = "${name}_fungi"
+    filename = "${samplename}_fungi.fastq"
     """
     extract_kraken_reads.py \\
-    --kraken-file ${output} \\
-    --report-file ${report} \\
+    --kraken-file $output \\
+    --report-file $report \\
     --taxid 4751 \\
-    ${read} \\
-    --output ${filename}.fastq
+    $read \\
+    --output $filename
     """
 }
 } else {
@@ -684,15 +684,15 @@ process EXTRACT_KRAKEN2_FUNGI {
 * STEP 3.0 - Mapping
 */
 process MAPPING_METASPADES {
-    tag "$name"
+    tag "$samplename"
     label "process_high"
 
     input:
-    tuple val(name), val(single_end), path(reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
+    tuple val(samplename), val(single_end), path(reads) from unclassified_reads.concat(virus_reads_assembly, bacteria_reads_assembly, fungi_reads_assembly )
 
 
     output:
-    tuple val(name), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
+    tuple val(samplename), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
     script:
     read = single_end ? "--s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
@@ -701,7 +701,7 @@ process MAPPING_METASPADES {
     spades.py \\
     $read \\
     --threads $task.cpus \\
-    -o ${name}
+    -o $samplename
     """
 }
 
@@ -709,11 +709,11 @@ process MAPPING_METASPADES {
 * STEP 3.1 - Evaluating assembly
 */
 process QUAST_EVALUATION {
-    tag "$name"
+    tag "$samplename"
     label "process_medium"
 
     input:
-    tuple val(name), file(contig) from contigs_quast
+    tuple val(samplename), file(contig) from contigs_quast
 
     output:
     file "/quast_results/report.html" into quast_results
@@ -731,11 +731,11 @@ process QUAST_EVALUATION {
 * STEP 4 - Contig search with kaiju
 */
 process KAIJU {
-    tag "$name"
+    tag "$samplename"
     label "process_high"
 
     input:
-    tuple val(name), file(contig) from contigs
+    tuple val(samplename), file(contig) from contigs
     tuple path(fmi), path(nodes), path(names) from kaiju_db_files
 
     output:
@@ -745,9 +745,9 @@ process KAIJU {
     """
     kaiju \\
     -t nodes.dmp \\
-    -f ${fmi} \\
-    -i ${contig} \\
-    -o ${name}_kaiju.out \\
+    -f $fmi \\
+    -i $contig \\
+    -o ${samplename}_kaiju.out \\
     -z $task.cpus \\
     -v
     """
@@ -755,70 +755,30 @@ process KAIJU {
 
 if (params.bacteria) {
 
-
-    process INDIVIDUALIZE_BACTERIA_READS {
-        label "process_low"
+    process GET_ASSEMBLIES_BACTERIA {
+        label "process_medium"
 
         input:
-        tuple val(name), val(single_end), path(reads) from bacteria_reads_mapping
-
+        tuple val(samplename),path(kraken2_report) from kraken2_report_bacteria_references
+        
         output:
-        tuple val(single_end), path("bacteria_read_*_*.fasta") into individualized_bacteria_reads
-
-        script:
-        first_reads = single_end ? ${reads} : ${reads[0]}
-        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"bacteria_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-        """
-        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("bacteria_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-        $second_reads
-        """
-    }
-
-    process EXTRACT_ASSEMBLY_SUMMARY_BACTERIA {
-        label "process_low"
-
-        output:
-        path("*.txt") into assembly_summary_bacteria
-
+        path("*_bacteria.tsv") into assemblies_data_bacteria
+        tuple val(samplename), path("*.fna")
         script:
         
         """       
         curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
-        """
-    }
+        extract_reference_assemblies.py $kraken2_report assembly_summary_bacteria.txt bacteria
+        
+        for script in ./*.sh
+        do
+         ./$script
+        done
 
-
-    process GET_ASSEMBLIES_URL_BACTERIA {
-        label "process_low"
-
-        input:
-        path(assemblies) from assembly_summary_bacteria
-        path(kraken2_report) from kraken2_report_bacteria_references
-
-        output:
-        path("*.sh") into download_instructions_bacteria
-        path("*_bacteria.tsv") into assemblies_data_bacteria
-
-        script:
-
-        """
-        extract_reference_assemblies.py ${kraken2_report} ${assemblies} bacteria
-        """
-    }
-    
-    process DOWNLOAD_ASSEMBLIES_BACTERIA {
-        label "process_low"
-
-        input:
-        path(instructions) from download_instructions_bacteria
-
-        output:
-        tuple val(sciname),path("*.fasta") into assemblies_bacteria
-
-        script:
-        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
-        """
-        ./$instructions
+        for compressedfile in ./*.gz
+        do
+            gzip -d $compressedfile
+        done
         """
     }
 
@@ -835,7 +795,7 @@ if (params.bacteria) {
         script:
         """
         bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
+        mkdir Bowtie2Index && mv $sciname Bowtie2Index
         """
     }
 
@@ -865,69 +825,30 @@ if (params.bacteria) {
 
 if (params.virus) {
 
-    process INDIVIDUALIZE_VIRUS_READS {
-        label "process_low"
+        process GET_ASSEMBLIES_VIRUS {
+        label "process_medium"
 
         input:
-        tuple val(name), val(single_end), path(reads) from virus_reads_mapping
-
+        tuple val(samplename),path(kraken2_report) from kraken2_report_virus_references
+        
         output:
-        tuple val(single_end), path("virus_read_*_*.fasta") into individualized_virus_reads
-
-        script:
-        first_reads = single_end ? ${reads} : ${reads[0]}
-        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"virus_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-        """
-        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("virus_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-        $second_reads
-        """
-    }
-
-    process EXTRACT_ASSEMBLY_SUMMARY_VIRUS {
-        label "process_low"
-
-        output:
-        path("*.txt") into assembly_summary_virus
-
+        path("*_virus.tsv") into assemblies_data_virus
+        tuple val(samplename), path("*.fna")
         script:
         
         """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt' > assembly_summary_virus.txt
-        """
-    }
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/virus/assembly_summary.txt' > assembly_summary_virus.txt
+        extract_reference_assemblies.py $kraken2_report assembly_summary_virus.txt virus
+        
+        for script in ./*.sh
+        do
+         ./$script
+        done
 
-
-    process GET_ASSEMBLIES_URL_VIRUS {
-        label "process_low"
-
-        input:
-        path(assemblies) from assembly_summary_virus
-        path(kraken2_report) from kraken2_report_virus_references
-
-        output:
-        path("*.sh") into download_instructions_virus
-        path("*_virus.tsv") into assemblies_data_virus
-
-        script:
-
-        """
-        extract_reference_assemblies.py ${kraken2_report} ${assemblies} virus
-        """
-    }
-    
-    process DOWNLOAD_ASSEMBLIES_VIRUS {
-        label "process_low"
-
-        input:
-        path(instructions) from download_instructions_virus
-
-        output:
-        tuple val(sciname),path("*.fasta") into assemblies_virus
-
-        script:
-        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
-        """
-        ./$instructions
+        for compressedfile in ./*.gz
+        do
+            gzip -d $compressedfile
+        done
         """
     }
 
@@ -944,7 +865,7 @@ if (params.virus) {
         script:
         """
         bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
+        mkdir Bowtie2Index && mv $sciname Bowtie2Index
         """
     }
 
@@ -974,69 +895,30 @@ if (params.virus) {
 
 if (params.fungi) {
 
-    process INDIVIDUALIZE_FUNGI_READS {
-        label "process_low"
+       process GET_ASSEMBLIES_FUNGI {
+        label "process_medium"
 
         input:
-        tuple val(name), val(single_end), path(reads) from fungi_reads_mapping
-
+        tuple val(samplename),path(kraken2_report) from kraken2_report_fungi_references
+        
         output:
-        tuple val(single_end), path("fungi_read_*_*.fasta") into individualized_fungi_reads
-
-        script:
-        first_reads = single_end ? ${reads} : ${reads[0]}
-        second_reads = single_end ? "" : "awk \'BEGIN {seqnum = 1}; /^>/ { file=sprintf(\"fungi_read_%i_2.fasta\",seqnum); seqnum ++}; {print >> file}\' ${reads[1]}"
-        """
-        awk 'BEGIN {seqnum = 1}; /^>/ { file=sprintf("fungi_read_%i_1.fasta",seqnum); seqnum ++}; {print > file}' $first_reads          
-        $second_reads
-        """
-    }
-
-    process EXTRACT_ASSEMBLY_SUMMARY_FUNGI {
-        label "process_low"
-
-        output:
-        path("*.txt") into assembly_summary_fungi
-
+        path("*_fungi.tsv") into assemblies_data_fungi
+        tuple val(samplename), path("*.fna")
         script:
         
         """       
         curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
-        """
-    }
+        extract_reference_assemblies.py $kraken2_report assembly_summary_fungi.txt fungi
+        
+        for script in ./*.sh
+        do
+         ./$script
+        done
 
-
-    process GET_ASSEMBLIES_URL_FUNGI {
-        label "process_low"
-
-        input:
-        path(assemblies) from assembly_summary_fungi
-        path(kraken2_report) from kraken2_report_fungi_references
-
-        output:
-        path("*.sh") into download_instructions_fungi
-        path("*_fungi.tsv") into assemblies_data_fungi
-
-        script:
-
-        """
-        extract_reference_assemblies.py ${kraken2_report} ${assemblies} fungi
-        """
-    }
-    
-    process DOWNLOAD_ASSEMBLIES_FUNGI {
-        label "process_low"
-
-        input:
-        path(instructions) from download_instructions_fungi
-
-        output:
-        tuple val(sciname),path("*.fasta") into assemblies_fungi
-
-        script:
-        sciname = ${instructions}.take(${instructions}.lastIndexOf("."))
-        """
-        ./$instructions
+        for compressedfile in ./*.gz
+        do
+            gzip -d $compressedfile
+        done
         """
     }
 
@@ -1053,7 +935,7 @@ if (params.fungi) {
         script:
         """
         bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv ${sciname} Bowtie2Index
+        mkdir Bowtie2Index && mv $sciname Bowtie2Index
         """
     }
 
