@@ -632,11 +632,9 @@ if (params.virus) {
         --output $filename
         """
     }
-
-
    
     virus_reads_mapping.join(virus_ref_assemblies).view()
-
+    
     /*
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
@@ -665,7 +663,8 @@ if (params.virus) {
 
 
     }
-
+    
+    
     process BOWTIE2_INDEX_BUILD_VIRUS {
         tag "$basename"
         label "process_medium"
