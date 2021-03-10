@@ -584,30 +584,6 @@ if (params.kraken2krona) {
 
 if (params.virus) {
 
-    process EXTRACT_KRAKEN2_VIRUS {
-        tag "$samplename"
-        label "process_medium"
-        
-        input:
-        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_virus
-        tuple val(samplename), path(report), path(output) from kraken2_virus_extraction
-
-        output:
-        tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
-
-        script:
-        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        filename = "${samplename}_virus.fastq"
-        """
-        extract_kraken_reads.py \\
-        --kraken-file $output \\
-        --report-file $report \\
-        --taxid 10239 \\
-        $read \\
-        --output $filename
-        """
-    }
-
     process GET_ASSEMBLIES_VIRUS {
         label "process_medium"
 
@@ -632,6 +608,32 @@ if (params.virus) {
         done
         """
     }
+
+    process EXTRACT_KRAKEN2_VIRUS {
+        tag "$samplename"
+        label "process_medium"
+        
+        input:
+        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_virus
+        tuple val(samplename), path(report), path(output) from kraken2_virus_extraction
+
+        output:
+        tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
+
+        script:
+        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
+        filename = "${samplename}_virus.fastq"
+        """
+        extract_kraken_reads.py \\
+        --kraken-file $output \\
+        --report-file $report \\
+        --taxid 10239 \\
+        $read \\
+        --output $filename
+        """
+    }
+
+
    
     virus_reads_mapping.join(virus_ref_assemblies).view()
 
@@ -708,6 +710,30 @@ if (params.virus) {
 
 if (params.bacteria) {
 
+    process GET_ASSEMBLIES_BACTERIA {
+        label "process_medium"
+
+        input:
+        tuple val(samplename),path(kraken2_report) from kraken2_report_bacteria_references
+        
+        output:
+        path("*_bacteria.tsv") into assemblies_data_bacteria
+        tuple val(samplename), path("*.fna") into bacteria_ref_assemblies
+        script:
+        
+        """       
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
+        extract_reference_assemblies.py $kraken2_report assembly_summary_bacteria.txt bacteria
+        
+        ./url_download_bacteria.sh
+
+        for compressedfile in ./*.gz
+        do
+            gzip -d \$compressedfile
+        done
+        """
+    }
+
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$samplename"
         label "process_medium"
@@ -733,29 +759,7 @@ if (params.bacteria) {
     }
 
 
-    process GET_ASSEMBLIES_BACTERIA {
-        label "process_medium"
 
-        input:
-        tuple val(samplename),path(kraken2_report) from kraken2_report_bacteria_references
-        
-        output:
-        path("*_bacteria.tsv") into assemblies_data_bacteria
-        tuple val(samplename), path("*.fna") into bacteria_ref_assemblies
-        script:
-        
-        """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
-        extract_reference_assemblies.py $kraken2_report assembly_summary_bacteria.txt bacteria
-        
-        ./url_download_bacteria.sh
-
-        for compressedfile in ./*.gz
-        do
-            gzip -d \$compressedfile
-        done
-        """
-    }
 
     bacteria_reads_mapping.join(bacteria_ref_assemblies).view()
 
@@ -805,6 +809,30 @@ if (params.bacteria) {
 
 if (params.fungi) {
 
+    process GET_ASSEMBLIES_FUNGI {
+        label "process_medium"
+
+        input:
+        tuple val(samplename),path(kraken2_report) from kraken2_report_fungi_references
+        
+        output:
+        path("*_fungi.tsv") into assemblies_data_fungi
+        tuple val(samplename), path("*.fna") into fungi_ref_assemblies
+        script:
+        
+        """       
+        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
+        extract_reference_assemblies.py $kraken2_report assembly_summary_fungi.txt fungi
+        
+        ./url_download_fungi.sh
+
+        for compressedfile in ./*.gz
+        do
+            gzip -d \$compressedfile
+        done
+        """
+    }
+
     process EXTRACT_KRAKEN2_FUNGI {
         tag "$samplename"
         label "process_medium"
@@ -830,29 +858,7 @@ if (params.fungi) {
     }
 
 
-    process GET_ASSEMBLIES_FUNGI {
-        label "process_medium"
 
-        input:
-        tuple val(samplename),path(kraken2_report) from kraken2_report_fungi_references
-        
-        output:
-        path("*_fungi.tsv") into assemblies_data_fungi
-        tuple val(samplename), path("*.fna") into fungi_ref_assemblies
-        script:
-        
-        """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
-        extract_reference_assemblies.py $kraken2_report assembly_summary_fungi.txt fungi
-        
-        ./url_download_fungi.sh
-
-        for compressedfile in ./*.gz
-        do
-            gzip -d \$compressedfile
-        done
-        """
-    }
 
     fungi_reads_mapping.join(fungi_ref_assemblies).view()
 

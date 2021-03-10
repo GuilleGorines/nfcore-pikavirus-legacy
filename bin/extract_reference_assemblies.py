@@ -16,7 +16,7 @@ with open(krakenrep) as krakenfile:
     krakenfile = [col[4] for col in krakenfile if col[3]=="S"]
     taxid_list = set(krakenfile)
     if len(taxid_list) == 0:
-        print(f"No IDs were found for {name_end}.")
+        print(f"No taxonomic IDs for {name_end} species were found.")
         sys.exit(2)    
 
 # Report:
