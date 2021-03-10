@@ -3,13 +3,16 @@
 import sys
 import csv
 
-info_msg = f"Usage: \n extract_reference_assemblies.py kraken2_report NCBI_assembly_summary.txt. \n The assembly summary is available in ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/."
+# Usage:
+# extract_reference_assemblies.py kraken2_report NCBI_assembly_summary.txt.
+# The assembly summaries for different taxa are available in ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/
+
 krakenrep = sys.argv[1]
 summary = sys.argv[2]
 name_end = sys.argv[3]
 
 with open(krakenrep) as krakenfile:
-    krakenfile = krakenfile.readlines().split("\t")
+    krakenfile = [line.split("\t") for line in krakenfile.readlines()]
     krakenfile = [col[4] for col in krakenfile if col[3]=="S"]
     taxid_list = set(krakenfile)
 
