@@ -426,16 +426,16 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
         path(database) from params.kaiju_db
 
         output:
-        tuple path("$kaijudb/*.fmi"), path("$kaijudb/nodes.dmp"), path("$kaijudb/names.dmp") into kaiju_db_files
+        path("kaijudb") into kaiju_db
 
         script:
-        kaijudb = database.toString() - ".tar.gz"
+        
         """
-        tar -xf $database $kaijudb
+        tar -xf $database kaijudb
         """
     }
 } else {
-    kaiju_db_files = params.kaiju_db
+    kaiju_db = params.kaiju_db
 }
 
 /*
@@ -597,7 +597,7 @@ if (params.virus) {
         script:
         
         """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/virus/assembly_summary.txt' > assembly_summary_virus.txt
+        wget -q -O assembly_summary_virus.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt'  
         extract_reference_assemblies.py $kraken2_report assembly_summary_virus.txt virus
         
         ./url_download_virus.sh
@@ -721,7 +721,7 @@ if (params.bacteria) {
         script:
         
         """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt' > assembly_summary_bacteria.txt
+        wget -q -O assembly_summary_bacteria.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt'
         extract_reference_assemblies.py $kraken2_report assembly_summary_bacteria.txt bacteria
         
         ./url_download_bacteria.sh
@@ -820,7 +820,7 @@ if (params.fungi) {
         script:
         
         """       
-        curl 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt' > assembly_summary_fungi.txt
+        wget -q -O assembly_summary_fungi.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt'
         extract_reference_assemblies.py $kraken2_report assembly_summary_fungi.txt fungi
         
         ./url_download_fungi.sh
@@ -941,7 +941,7 @@ process QUAST_EVALUATION {
     tuple val(samplename), file(contig) from contigs_quast
 
     output:
-    file "/quast_results/report.html" into quast_results
+    file("/quast_results/report.html") into quast_results
 
     script:
 
@@ -961,16 +961,17 @@ process KAIJU {
 
     input:
     tuple val(samplename), file(contig) from contigs
-    tuple path(fmi), path(nodes), path(names) from kaiju_db_files
+    path(kaijudb) from kaiju_db
 
     output:
-        
+    tuple val(samplename), path("*_kaiju.out") into kaiju_results
+
     script:
 
     """
     kaiju \\
-    -t nodes.dmp \\
-    -f $fmi \\
+    -t $kaijudb/nodes.dmp \\
+    -f $kaijudb/*.fmi \\
     -i $contig \\
     -o ${samplename}_kaiju.out \\
     -z $task.cpus \\

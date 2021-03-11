@@ -16,7 +16,7 @@ with open(krakenrep) as krakenfile:
     krakenfile = [col[4] for col in krakenfile if col[3]=="S"]
     taxid_list = set(krakenfile)
     if len(taxid_list) == 0:
-        print(f"No taxonomic IDs for {name_end} species were found.")
+        print(f"No species were identified in the kraken report.")
         sys.exit(2)    
 
 # Report:
@@ -28,7 +28,11 @@ with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
 assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list]
-raw_assembly = [[col[0],col[6]] for col in assembly_sum]
+if len(assembly_sum) == 0:
+    print(f"No {name_end} species were found in the kraken report.")
+    sys.exit(2)
+
+raw_assembly = [[col[0].replace(" ","_"),col[6]] for col in assembly_sum]
 
 # 0: assembly_accession
 # 4: refseq_category
@@ -41,14 +45,12 @@ raw_assembly = [[col[0],col[6]] for col in assembly_sum]
 # 19: url
 # full info: ftp://ftp.ncbi.nlm.nih.gov/genomes/README_assembly_summary.txt
 
-
-
 header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", "Assembly_level", "Refseq_category", "Representation", "Assembly_url"]
 assembly_sum.insert(0,header)
 
 namefile = f"chosen_assemblies_data_{name_end}.tsv"
 with open(namefile, "w") as chosen_assemblies:
-    chosen_assemblies_tsv = csv.writer(chosen_assemblies, delimiter = "\t")
+    chosen_assemblies_tsv = csv.writer(chosen_assemblies, delimiter = "\n")
     chosen_assemblies_tsv.writerow(assembly_sum)
 
 url_file = f"url_download_{name_end}.sh"
