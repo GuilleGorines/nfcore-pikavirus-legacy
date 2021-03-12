@@ -625,8 +625,8 @@ if (params.virus) {
         filename = "${samplename}_virus.fastq"
         """
         extract_kraken_reads.py \\
-        --k $output \\
-        --r $report \\
+        -k $output \\
+        -r $report \\
         --taxid 10239 \\
         $read \\
         --output $filename
@@ -749,8 +749,8 @@ if (params.bacteria) {
         filename = "${samplename}_bacteria.fastq"
         """
         extract_kraken_reads.py \\
-        --k ${output} \\
-        --r ${report} \\
+        -k ${output} \\
+        -r ${report} \\
         --taxid 2 \\
         ${read} \\
         --output ${filename}
@@ -848,8 +848,8 @@ if (params.fungi) {
         filename = "${samplename}_fungi.fastq"
         """
         extract_kraken_reads.py \\
-        --k $output \\
-        --r $report \\
+        -k $output \\
+        -r $report \\
         --taxid 4751 \\
         $read \\
         --output $filename
