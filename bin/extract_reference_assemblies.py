@@ -26,7 +26,7 @@ with open(krakenrep) as krakenfile:
 with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
-assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list and col[10] == "latest"]
+assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in assembly_sum if col[6] in taxid_list and col[10] == "latest"]
 if len(assembly_sum) == 0:
     print(f"No {name_end} species were found in the kraken report.")
     sys.exit(2)
@@ -57,7 +57,7 @@ raw_assembly = [[col[0].replace(" ","_"),col[6]] for col in assembly_sum]
 # Column 21: "relation_to_type_material"
 # full info: ftp://ftp.ncbi.nlm.nih.gov/genomes/README_assembly_summary.txt
 
-header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", "Assembly_level", "Refseq_category", "Representation", "Assembly_url"]
+header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", "Assembly_level", "Refseq_category", "Representation", "Status", "Assembly_url"]
 assembly_sum.insert(0,header)
 
 namefile = f"chosen_assemblies_data_{name_end}.tsv"
