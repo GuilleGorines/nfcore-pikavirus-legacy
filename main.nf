@@ -478,13 +478,13 @@ if (params.trimming) {
         tuple val(samplename), val(single_end), path(reads) from ch_cat_fastp
 
         output:
-        tuple val(samplename), val(single_end), path("*fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
+        tuple val(samplename), val(single_end), path("*trim.fastq.gz") into trimmed_paired_kraken2, trimmed_paired_fastqc, trimmed_paired_extract_virus, trimmed_paired_extract_bacteria, trimmed_paired_extract_fungi
         tuple val(samplename), val(single_end), path("*fail.fastq.gz") into trimmed_unpaired
 
         script:
         detect_adapter =  single_end ? "" : "--detect_adapter_for_pe"
-        reads1 = single_end ? "--in1 ${reads} --out1 ${samplename}_trim.fastq.gz --failed_out ${samplename}.fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${samplename}_1.fastq.gz --unpaired1 ${samplename}_1_fail.fastq.gz"
-        reads2 = single_end ? "" : "--in2 ${reads[1]} --out2 ${samplename}_2.fastq.gz --unpaired2 ${samplename}_2_fail.fastq.gz"
+        reads1 = single_end ? "--in1 ${reads} --out1 ${samplename}_trim.fastq.gz --failed_out ${samplename}_fail.fastq.gz" : "--in1 ${reads[0]} --out1 ${samplename}_1_trim.fastq.gz --unpaired1 ${samplename}_1_fail.fastq.gz"
+        reads2 = single_end ? "" : "--in2 ${reads[1]} --out2 ${samplename}_2_trim.fastq.gz --unpaired2 ${samplename}_2_fail.fastq.gz"
         
         """
         fastp \\
