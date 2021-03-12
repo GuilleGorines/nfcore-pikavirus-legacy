@@ -758,8 +758,6 @@ if (params.bacteria) {
     }
 
 
-
-
     bacteria_reads_mapping.join(bacteria_ref_assemblies).view()
 
     /*
