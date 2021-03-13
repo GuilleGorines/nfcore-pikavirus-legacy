@@ -26,12 +26,12 @@ with open(krakenrep) as krakenfile:
 with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
-assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in assembly_sum if col[6] in taxid_list and col[10] == "latest"]
+assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list and col[4] == "reference genome"]
 if len(assembly_sum) == 0:
     print(f"No {name_end} species were found in the kraken report.")
     sys.exit(2)
 
-raw_assembly = [[col[0].replace(" ","_"),col[7]] for col in assembly_sum]
+raw_assembly = [[col[0].replace(" ","_"),col[6]] for col in assembly_sum]
 
 # Column 0: "assembly_accession"
 # Column 1: "bioproject"
