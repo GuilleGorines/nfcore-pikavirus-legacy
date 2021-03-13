@@ -31,7 +31,7 @@ if len(assembly_sum) == 0:
     print(f"No {name_end} species were found in the kraken report.")
     sys.exit(2)
 
-raw_assembly = [[col[0].replace(" ","_"),col[6]] for col in assembly_sum]
+raw_assembly = [[col[0].replace(" ","_"),col[7]] for col in assembly_sum]
 
 # Column 0: "assembly_accession"
 # Column 1: "bioproject"
