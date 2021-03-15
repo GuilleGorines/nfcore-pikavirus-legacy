@@ -547,7 +547,6 @@ process SCOUT_KRAKEN2 {
     --report ${samplename}.report \\
     --output ${samplename}.kraken \\
     --unclassified-out ${unclass_name} \\
-
     ${reads}
     """
 }
