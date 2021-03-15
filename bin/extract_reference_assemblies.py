@@ -12,11 +12,12 @@ name_end = sys.argv[3]
 
 with open(krakenrep) as krakenfile:
     krakenfile = [line.split("\t") for line in krakenfile.readlines()]
-    krakenfile = [col[4] for col in krakenfile if col[3]=="S"]
-    taxid_list = set(krakenfile)
-    if len(taxid_list) == 0:
+    krakenfile = [col[5].replace("\n","").lstrip() for col in krakenfile if col[3]=="S"]
+    name_list = set(krakenfile)
+    if len(name_list) == 0:
         print(f"No species were identified in the kraken report.")
         sys.exit(2)    
+
 
 # Report:
 #   3: rank code (Unclass, Kingdom...)
@@ -25,8 +26,7 @@ with open(krakenrep) as krakenfile:
 
 with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
-
-assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[19]] for col in assembly_sum if col[6] in taxid_list and col[4] == "reference genome"]
+assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in assembly_sum if col[7] in name_list]
 if len(assembly_sum) == 0:
     print(f"No {name_end} species were found in the kraken report.")
     sys.exit(2)

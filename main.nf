@@ -98,7 +98,7 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Trimming']       = params.outdir
+summary['Trimming']         = params.trimming
 summary['Virus Search']     = params.virus
 summary['Bacteria Search']  = params.bacteria
 summary['Fungi Search']     = params.fungi
@@ -547,6 +547,7 @@ process SCOUT_KRAKEN2 {
     --report ${samplename}.report \\
     --output ${samplename}.kraken \\
     --unclassified-out ${unclass_name} \\
+
     ${reads}
     """
 }
@@ -574,7 +575,7 @@ if (params.kraken2krona) {
         kreport2krona.py \\
         --report-file $report \\
         --output ${samplename}.krona
-
+        --threads $task.cpus
         ktImportText \\
         -o ${samplename}.krona.html \\
         ${samplename}.krona
