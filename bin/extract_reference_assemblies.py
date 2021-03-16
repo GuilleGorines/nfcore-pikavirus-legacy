@@ -10,19 +10,20 @@ krakenrep = sys.argv[1]
 summary = sys.argv[2]
 name_end = sys.argv[3]
 
-with open(krakenrep) as krakenfile:
-    krakenfile = [line.split("\t") for line in krakenfile.readlines()]
+with open(krakenrep) as krakenreport:
+    krakenreport = [line.split("\t") for line in krakenreport.readlines()]
     idlist = []
     namelist = []
-    for line in krakenfile:
+    for line in krakenreport:
         if line[3] == "S1":
-            idlist.append(col[4])
-            namelist.append(col[5].strip)
-        elif line[3] == "S" and line[4] not in idlist:
-            idlist.append(col[4])
-            namelist.append(col[5].strip)
-
-    if len(name_list) == 0:
+            idlist.append(line[4])
+            namelist.append(line[5].strip)
+    for line in krakenreport:
+        if line[3] == "S" and line[4] not in idlist:
+            idlist.append(line[4])
+            namelist.append(line[5].strip)
+    
+    if len(namelist) == 0:
         print(f"No species were identified in the kraken report.")
         sys.exit(2)    
 
@@ -34,10 +35,18 @@ with open(krakenrep) as krakenfile:
 with open(summary) as assembly_sum:
     assembly_sum = [line.split("\t") for line in assembly_sum.readlines() if not line.startswith("#")]
 
-    for taxid,name in zip(idlist,namelist):
-        
+chosen_assemblies = []
+for name in namelist:
+    candidate = [line for line in assembly_sum if line[8].split(":")[1] in name and line[7] == name]
+    if len(candidate) == 0:
+        candidate = [line for line in assembly_sum if line[7] == name and line[4] == "reference genome" or line[4] == "reference genome"]
+        if len(candidate) == 0:
+            candidate = [line for line in assembly_sum if line[7] == name]
+    
+    if len(candidate) > 0:
+        chosen_assemblies.append(candidate[0])
 
-assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in assembly_sum if col[7] in name_list]
+assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in chosen_assemblies]
 if len(assembly_sum) == 0:
     print(f"No {name_end} species were found in the kraken report.")
     sys.exit(2)
@@ -72,14 +81,14 @@ header=["Scientific_name", "Species_Taxonomic_ID", "Assembly_accession_chosen", 
 assembly_sum.insert(0,header)
 
 namefile = f"chosen_assemblies_data_{name_end}.tsv"
-with open(namefile, "w") as chosen_assemblies:
+with open(namefile, "w") as chosen_assemblies_file:
     for line in assembly_sum:
         for field in line:
-            chosen_assemblies.write(str(field))
+            chosen_assemblies_file.write(str(field))
             if line.index(field) == len(line)-1:
-                chosen_assemblies.write("\n")
+                chosen_assemblies_file.write("\n")
             else:
-                chosen_assemblies.write("\t")
+                chosen_assemblies_file.write("\t")
 
 url_file = f"url_download_{name_end}.sh"
 
