@@ -121,10 +121,3 @@ In addition, references of tools and data used in this pipeline are as follows:
 > _Nature Methods_ volume 15, pages475–476(2018). doi [10.1038/s41592-018-0046-7](https://doi.org/10.1038/s41592-018-0046-7)
 >
 
-> Fast and sensitive taxonomic classification for metagenomics with Kaiju
-> 
-> Peter Menzel, Kim Lee Ng & Anders Krogh
-> 
-> _Nature Communications_ volume 7, Article number: 11257 (2016). doi [10.1038/ncomms11257](https://doi.org/10.1038/ncomms11257)
-
-
