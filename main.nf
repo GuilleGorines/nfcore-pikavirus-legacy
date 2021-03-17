@@ -33,7 +33,7 @@ def helpMessage() {
     Options:
       --trimming [bool]               Perform initial trimming of lower-quality sections (Default: true)
       --kraken2_db [path]             Kraken database for taxa identification (Default: hosted on Zenodo)
-      --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: false)
+      --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: true)
       --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
       --bacteria [bool]               Search for bacteria (Default: true)
@@ -573,7 +573,7 @@ if (params.kraken2krona) {
         """
         kreport2krona.py \\
         --report-file $report \\
-        --output ${samplename}.krona
+        --output ${samplename}.krona \\
         --threads $task.cpus
         
         ktImportText \\
