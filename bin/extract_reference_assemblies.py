@@ -37,6 +37,7 @@ with open(summary) as assembly_sum:
 
 chosen_assemblies = []
 for name in namelist:
+    candidate = []
     try:
         candidate = [line for line in assembly_sum if line[8].split(":")[1] in name and line[7] == name]
     except:
