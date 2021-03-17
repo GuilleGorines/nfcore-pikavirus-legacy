@@ -912,11 +912,10 @@ process MAPPING_METASPADES {
     tuple val(samplename), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
     script:
-    read = single_end ? "-s ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+    read = single_end ? "-s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
 
     """
     spades.py \\
-    --meta \\
     $read \\
     --threads $task.cpus \\
     -o metaspades_result
