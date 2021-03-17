@@ -37,14 +37,16 @@ with open(summary) as assembly_sum:
 
 chosen_assemblies = []
 for name in namelist:
-    candidate = [line for line in assembly_sum if line[8].split(":")[1] in name and line[7] == name]
-    if len(candidate) == 0:
-        candidate = [line for line in assembly_sum if line[7] == name and line[4] == "reference genome" or line[4] == "reference genome"]
+    try:
+        candidate = [line for line in assembly_sum if line[8].split(":")[1] in name and line[7] == name]
+    except:
         if len(candidate) == 0:
-            candidate = [line for line in assembly_sum if line[7] == name]
-    
-    if len(candidate) > 0:
-        chosen_assemblies.append(candidate[0])
+            candidate = [line for line in assembly_sum if line[7] == name and line[4] == "reference genome" or line[4] == "reference genome"]
+            if len(candidate) == 0:
+                candidate = [line for line in assembly_sum if line[7] == name]
+        
+        if len(candidate) > 0:
+            chosen_assemblies.append(candidate[0])
 
 assembly_sum = [[col[7],col[6],col[0],col[11],col[4],col[13],col[10],col[19]] for col in chosen_assemblies]
 if len(assembly_sum) == 0:
