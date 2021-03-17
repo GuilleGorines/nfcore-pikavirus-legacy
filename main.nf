@@ -575,6 +575,7 @@ if (params.kraken2krona) {
         --report-file $report \\
         --output ${samplename}.krona
         --threads $task.cpus
+        
         ktImportText \\
         -o ${samplename}.krona.html \\
         ${samplename}.krona
@@ -609,13 +610,13 @@ if (params.virus) {
         """
     }
 
+
     process EXTRACT_KRAKEN2_VIRUS {
         tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_virus
-        tuple val(samplename), path(report), path(output) from kraken2_virus_extraction
+        tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_virus.join(kraken2_virus_extraction)
 
         output:
         tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
@@ -738,8 +739,7 @@ if (params.bacteria) {
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(reads) from trimmed_paired_extract_bacteria
-        tuple val(samplename), path(report), path(output) from kraken2_bacteria_extraction
+        tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_bacteria.join(kraken2_bacteria_extraction)
 
         output:
         tuple val(samplename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_mapping
@@ -756,7 +756,6 @@ if (params.bacteria) {
         --output ${filename}
         """
     }
-
 
     bacteria_reads_mapping.join(bacteria_ref_assemblies).view()
 
@@ -835,8 +834,7 @@ if (params.fungi) {
         label "process_medium"
 
         input:
-        tuple val(samplename), val(single_end), file(reads) from trimmed_paired_extract_fungi
-        tuple val(samplename), file(report), file(output) from kraken2_fungi_extraction
+        tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_fungi.join(kraken2_fungi_extraction)
 
         output:
         tuple val(samplename), val(single_end), file("*_fungi.fastq") into fungi_reads_mapping
@@ -854,11 +852,7 @@ if (params.fungi) {
         """
     }
 
-
-
-
     fungi_reads_mapping.join(fungi_ref_assemblies).view()
-
 
     /*
     process BOWTIE2_INDEX_BUILD_FUNGI {
