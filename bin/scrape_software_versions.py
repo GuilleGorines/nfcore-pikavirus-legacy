@@ -11,7 +11,8 @@ regexes = {
     "Fastp": ["v_fastp.txt", r"fastp\s(\S+)"],
     "Kraken2": ["v_kraken2.txt", r"Kraken\sversion\s(\S+)"],
     "Kaiju": ["v_kaiju.txt", r"Kaiju (\S+)"],
-    "Bowtie2": ['v_bowtie2.txt', r"bowtie2-align-s\sversion\s(\S+)"]
+    "Bowtie2": ["v_bowtie2.txt", r"bowtie2-align-s\sversion\s(\S+)"],
+    "Mash": ["v_mash.txt",r"Mash\sversion\s(\S+)"]
 }
 
 results = OrderedDict()
@@ -22,6 +23,7 @@ results["FastP"] = '<span style="color:#999999;">N/A</span>'
 results["Kraken2"] = '<span style="color:#999999;">N/A</span>'
 results["Kaiju"] = '<span style="color:#999999;">N/A</span>'
 results["Bowtie2"] = '<span style="color:#999999;">N/A</span>'
+results["Mash"] = '<span style="color:#999999;">N/A</span>'
 
 # Search each file using its regex
 for k, v in regexes.items():

@@ -171,6 +171,7 @@ process get_software_versions {
     fastp -v > v_fastp.txt
     kaiju -help 2>&1 v_kaiju.txt &
     bowtie2 --version > v_bowtie2.txt
+    mash -v | grep version > v_mash.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
