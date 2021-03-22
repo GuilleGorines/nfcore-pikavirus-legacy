@@ -36,6 +36,7 @@ def helpMessage() {
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: true)
       --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
+      --virus_ref_dir                 Path to the ref data used to map against virus (Default: ) ####################
       --bacteria [bool]               Search for bacteria (Default: true)
       --fungi [bool]                  Search for fungi (Default: true)
       --skip_assembly [bool]          Skip the assembly steps (Default: false)
@@ -554,6 +555,19 @@ process SCOUT_KRAKEN2 {
 
 /*
  * STEP 2.1.2 - Krona output for Kraken scouting
+
+
+        # Proceso:
+        #   1) sacar del report los s
+        #   2) encontrar las referencias que apuntan a los s y s1
+        #   3) hacer mash con esas referencias contra las reads extraidas
+        #   4) guardar las referencias con un p-valor relevante (0.05?) y usarlas posteriormente en bowtie2
+
+
+            PROBLEMA! SI LAS REFERENCIAS TIENEN UN NOMBRE DISTINTO QUE HAGO? LANZO MASH SIN MÁSH?
+
+
+
  */
 if (params.kraken2krona) {
 
@@ -585,32 +599,7 @@ if (params.kraken2krona) {
 }
 
 if (params.virus) {
-
-    process GET_ASSEMBLIES_VIRUS {
-        label "process_medium"
-
-        input:
-        tuple val(samplename),path(kraken2_report) from kraken2_report_virus_references
-        
-        output:
-        path("*_virus.tsv") into assemblies_data_virus
-        tuple val(samplename), path("*.fna") into virus_ref_assemblies
-        
-        script:
-        
-        """       
-        wget -q -O assembly_summary_virus.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt'  
-        extract_reference_assemblies.py $kraken2_report assembly_summary_virus.txt virus
-        
-        ./url_download_virus.sh
-        
-        for compressedfile in ./*.gz
-        do
-            gzip -d \$compressedfile
-        done
-        """
-    }
-
+    
 
     process EXTRACT_KRAKEN2_VIRUS {
         tag "$samplename"
@@ -621,6 +610,7 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
+        tuple val(samplename), val(single_end), path(report), path("*_virus.fastq") into virus_ref_selection
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
@@ -634,10 +624,34 @@ if (params.virus) {
         --output $filename
         """
     }
-   
-    virus_reads_mapping.join(virus_ref_assemblies).view()
+    
+    process MASH_DETECT_VIRUS_REFERENCES {
+        tag "$samplename"
+        label "process_medium"
+        
+        input:
+        tuple val(samplename), val(single_end), path(report), path(reads) from virus_ref_selection
+
+        output:
+
+        script:
+        queryname = single_end ? "${reads}" : "${samplename}_"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname} " 
+        """
+        $merging \\
+        reference_choosing.py $report $refdir $queryname $task.cpus
+        """       
+    }
+
+
     
     /*
+
+
+    virus_reads_mapping.join(virus_ref_assemblies).view()
+
+
+
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
         label "process_high"
