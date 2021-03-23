@@ -6,10 +6,7 @@ from pathlib import Path
 krakenrep = sys.argv[1]
 refdir = Path(sys.argv[2])
 query = sys.argv[3]
-threads = sys.argv[4]
-
-if not threads:
-    threads = 1
+threads = 1
 
 with open(krakenrep) as krakenreport:
     krakenreport = [line.split("\t") for line in krakenreport.readlines()]
@@ -30,14 +27,23 @@ filedict = {}
 
 for taxid in idlist:
     for filename in os.listdir(refdir):
-        if speciesname in namelist:
-            if speciesname not in filedict.keys():
-                dirdict[speciesname]=[filename]
+        if taxid in filename:
+            if taxid not in filedict.keys():
+                filedict.setdefault(taxid,[]).append(f"{refdir}/{filename}")
             else:
-                dirdict[speciesname].append[filename]
+                if f"{refdir}/{filename}" not in filedict[taxid]:
+                    filedict[taxid].append(f"{refdir}/{filename}")
 
+mashdict = {}
 for taxid,reffiles in filedict.items():
-    fullprocess = ["mash","dist","-p",threads,"-l",reffiles,query]
-    process_result = subprocess.check_output(fullprocess, stdout = outfile)
-    print(process_result)
+    mashdict[taxid] = []
+    if len(reffiles) > 0:
+        with open(f"{taxid}_mash.txt","w") as outfile:
+            for single_reffile in reffiles:
+                fullprocess = ["mash", "dist", "-p", str(threads),single_reffile, query]
+                mashcommand = subprocess.run(fullprocess, stdout=subprocess.PIPE)
+                mashdict[taxid].append(mashcommand.stdout.decode("utf8").replace("\n","").split("\t"))
 
+for taxid,mashresults in mashdict.items():
+    true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
+    print(true_mashresults)
