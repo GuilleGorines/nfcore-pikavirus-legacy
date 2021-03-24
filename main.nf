@@ -36,9 +36,9 @@ def helpMessage() {
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: true)
       --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
-      --virus_ref_dir [path]          Path to the ref data used to map against virus (Default: ) ####################
+      --vir_ref_dir [path]          Path to the ref data used to map against virus (Default: ) ####################
       --bacteria [bool]               Search for bacteria (Default: true)
-      --bacteria_ref_dir [path]       Path to the ref data used to map against bacteria (Default: ) ####################
+      --bact_ref_dir [path]       Path to the ref data used to map against bacteria (Default: ) ####################
       --fungi [bool]                  Search for fungi (Default: true)
       --fungi_ref_dir [path]          Path to the ref data used to map against fungi (Default: ) ####################
       --skip_assembly [bool]          Skip the assembly steps (Default: false)
@@ -103,8 +103,11 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 summary['Input']            = params.input
 summary['Trimming']         = params.trimming
 summary['Virus Search']     = params.virus
+summary['Virus Ref']     = params.vir_ref_dir
 summary['Bacteria Search']  = params.bacteria
+summary['Bacteria Ref']     = params.bact_ref_dir
 summary['Fungi Search']     = params.fungi
+summary['Fungi Ref']     = params.fungi_ref_dir
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
@@ -421,7 +424,7 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
 /*
  * PREPROCESSING: KAIJU DATABASE
  */
-if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
+if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || params.kaiju_db.endsWith('.tgz') ){
 
     process UNCOMPRESS_KAIJUDB {
         label 'error_retry'
@@ -440,6 +443,63 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar')){
     }
 } else {
     kaiju_db = params.kaiju_db
+}
+
+/*
+* PREPROCESSING: REFERENCE FILES
+*/
+if (params.vir_ref_dir.endsWith('.gz') || params.vir_ref_dir.endsWith('.tar') || params.vir_ref_dir.endsWith('.tgz') {
+
+    process UNCOMPRESS_VIR_REF {
+        label 'error_retry'
+
+        input:
+        path(virref) from params.vir_ref_dir
+
+        output:
+        path("viralrefs") into virus_references
+        
+        script:
+        """
+        tar -xf $virref viralrefs
+        """
+    }
+}
+
+if (params.bact_ref_dir.endsWith('.gz') || params.bact_ref_dir.endsWith('.tar') || params.bact_ref_dir.endsWith('.tgz') {
+
+    process UNCOMPRESS_BACT_REF {
+        label 'error_retry'
+
+        input:
+        path(bactref) from params.bact_ref_dir
+
+        output:
+        path("bactrefs") into bacteria_references
+        
+        script:
+        """
+        tar -xf $bactref bactrefs
+        """
+    }
+}
+
+if (params.fungi_ref_dir.endsWith('.gz') || params.fungi_ref_dir.endsWith('.tar') || params.fungi_ref_dir.endsWith('.tgz') {
+
+    process UNCOMPRESS_FUNGI_REF {
+        label 'error_retry'
+
+        input:
+        path(fungiref) from params.fungi_ref_dir
+
+        output:
+        path("fungirefs") into fungi_references
+        
+        script:
+        """
+        tar -xf $fungiref fungirefs
+        """
+    }
 }
 
 /*
@@ -467,7 +527,7 @@ process RAW_SAMPLES_FASTQC {
 }
 
 /*
- * STEP 1.2 - TRIMMING​​​​​​​Human alphaherpesvirus​​​​​​​Human alphaherpesvirus
+ * STEP 1.2 - TRIMMING​​​​​​​
 if (params.trimming) {
     process FASTP {
         tag "$samplename"
@@ -556,19 +616,6 @@ process SCOUT_KRAKEN2 {
 
 /*
  * STEP 2.1.2 - Krona output for Kraken scouting
-
-
-        # Proceso:
-        #   1) sacar del report los s
-        #   2) encontrar las referencias que apuntan a los s y s1
-        #   3) hacer mash con esas referencias contra las reads extraidas
-        #   4) guardar las referencias con un p-valor relevante (0.05?) y usarlas posteriormente en bowtie2
-
-
-            PROBLEMA! SI LAS REFERENCIAS TIENEN UN NOMBRE DISTINTO QUE HAGO? LANZO MASH SIN MÁSH?
-
-
-
  */
 if (params.kraken2krona) {
 
