@@ -587,8 +587,8 @@ if (params.kraken2krona) {
 
         """
         kreport2krona.py \\
-        --report-file $report \\
-        --output ${samplename}.krona \\
+        --r $report \\
+        --o ${samplename}.krona \\
         --threads $task.cpus
         
         ktImportText \\
@@ -633,10 +633,11 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(report), path(reads) from virus_ref_selection
 
         output:
+        tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}_"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname} " 
+        queryname = single_end ? "${reads}" : "${samplename}"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}" 
         """
         $merging \\
         reference_choosing.py $report $refdir $queryname $task.cpus
@@ -657,7 +658,7 @@ if (params.virus) {
         label "process_high"
         
         input:
-
+            from bowtie_virus_references
         output:
 
         script:

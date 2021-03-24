@@ -44,6 +44,11 @@ for taxid,reffiles in filedict.items():
                 mashcommand = subprocess.run(fullprocess, stdout=subprocess.PIPE)
                 mashdict[taxid].append(mashcommand.stdout.decode("utf8").replace("\n","").split("\t"))
 
+os.mkdir(f"Chosen_fnas", 0o777)
+
 for taxid,mashresults in mashdict.items():
     true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
-    print(true_mashresults)
+    for fna in true_mashresults:
+        filename = fna[0].split("\t")[-1]
+        os.replace(fna[0],f"Chosen_fnas/{filename}")
+
