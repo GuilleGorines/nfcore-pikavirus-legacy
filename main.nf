@@ -36,9 +36,11 @@ def helpMessage() {
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: true)
       --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
-      --virus_ref_dir                 Path to the ref data used to map against virus (Default: ) ####################
+      --virus_ref_dir [path]          Path to the ref data used to map against virus (Default: ) ####################
       --bacteria [bool]               Search for bacteria (Default: true)
+      --bacteria_ref_dir [path]       Path to the ref data used to map against bacteria (Default: ) ####################
       --fungi [bool]                  Search for fungi (Default: true)
+      --fungi_ref_dir [path]          Path to the ref data used to map against fungi (Default: ) ####################
       --skip_assembly [bool]          Skip the assembly steps (Default: false)
       --cleanup [bool]                Remove intermediate files after pipeline completion (Default: false)
       --outdir [file]                 The output directory where the results will be saved (Default: './results')
@@ -381,7 +383,7 @@ process CAT_FASTQ {
         }
     } else {
         if (readList.size > 1) {
-            """
+            """​​​​​​​Human alphaherpesvirus
             cat ${readList.sort().join(' ')} > ${sample}.merged.fastq.gz
             """
         } else {
@@ -465,8 +467,7 @@ process RAW_SAMPLES_FASTQC {
 }
 
 /*
- * STEP 1.2 - TRIMMING
- */
+ * STEP 1.2 - TRIMMING​​​​​​​Human alphaherpesvirus​​​​​​​Human alphaherpesvirus
 if (params.trimming) {
     process FASTP {
         tag "$samplename"
@@ -587,8 +588,8 @@ if (params.kraken2krona) {
 
         """
         kreport2krona.py \\
-        --r $report \\
-        --o ${samplename}.krona \\
+        -r $report \\
+        -o ${samplename}.krona \\
         --threads $task.cpus
         
         ktImportText \\
@@ -600,7 +601,6 @@ if (params.kraken2krona) {
 
 if (params.virus) {
     
-
     process EXTRACT_KRAKEN2_VIRUS {
         tag "$samplename"
         label "process_medium"
@@ -642,28 +642,24 @@ if (params.virus) {
         $merging \\
         reference_choosing.py $report $refdir $queryname $task.cpus
         """       
-    }
+    } 
 
-
-    
-    /*
-
-
-    virus_reads_mapping.join(virus_ref_assemblies).view()
-
-
+    virus_reads_mapping.join(bowtie_virus_references).view()
 
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
         label "process_high"
         
         input:
-            from bowtie_virus_references
+        tuple val(samplename), val(single_end), path(reads), path(reference) from virus_reads_mapping.join(bowtie_virus_references)
+        
         output:
-
+        
         script:
 
         """
+
+
         bowtie2-build \\
         --seed 1 \\
         --threads $task.cpus \\
