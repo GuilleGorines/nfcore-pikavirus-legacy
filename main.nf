@@ -568,7 +568,9 @@ if (params.kraken2krona) {
         tag "$samplename"
         label "process_medium"
         publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
-        saveAs: {}
+        saveAs: { filename ->
+                    filename.indexOf(".krona.html") > 0 ? "kraken2_krona_result/$filename" : "$filename"}
+
 
         input:
         tuple val(samplename), path(report) from kraken2_reports_krona
@@ -625,14 +627,14 @@ if (params.virus) {
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        filename = "${samplename}_virus.fastq"
+        output = single_end ? "--output ${samplename}_virus.fastq" : "-o1 ${samplename}_virus_1.fastq -o2 ${samplename}_virus_2.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
         -r $report \\
         --taxid 10239 \\
         $read \\
-        --output $filename
+        $output
         """
     }
     
