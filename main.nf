@@ -103,11 +103,11 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 summary['Input']            = params.input
 summary['Trimming']         = params.trimming
 summary['Virus Search']     = params.virus
-summary['Virus Ref']     = params.vir_ref_dir
+if (params.virus) summary['    Virus Ref'] = params.vir_ref_dir
 summary['Bacteria Search']  = params.bacteria
-summary['Bacteria Ref']     = params.bact_ref_dir
+if (params.bacteria) summary['    Bacteria Ref']     = params.bact_ref_dir
 summary['Fungi Search']     = params.fungi
-summary['Fungi Ref']     = params.fungi_ref_dir
+if (params.fungi) summary['    Fungi Ref']     = params.fungi_ref_dir
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
@@ -414,7 +414,7 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
         dbname = "kraken2db"
         """
         mkdir $dbname
-        tar -xvf $database --strip-components 1 -C $dbname
+        tar -xf $database --strip-components 1 -C $dbname
         """
     }
 } else {
@@ -424,7 +424,7 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
 /*
  * PREPROCESSING: KAIJU DATABASE
  */
-if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || params.kaiju_db.endsWith('.tgz') ){
+if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || params.kaiju_db.endsWith('.tgz')){
 
     process UNCOMPRESS_KAIJUDB {
         label 'error_retry'
@@ -436,70 +436,14 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || param
         path("kaijudb") into kaiju_db
 
         script:
-        
+        kaijudbname = "kaijudb"
         """
-        tar -xf $database kaijudb
+        mkdir $kaijudbname
+        tar -xf $database --strip-components 1 -C $kaijudbname
         """
     }
 } else {
     kaiju_db = params.kaiju_db
-}
-
-/*
-* PREPROCESSING: REFERENCE FILES
-*/
-if (params.vir_ref_dir.endsWith('.gz') || params.vir_ref_dir.endsWith('.tar') || params.vir_ref_dir.endsWith('.tgz') {
-
-    process UNCOMPRESS_VIR_REF {
-        label 'error_retry'
-
-        input:
-        path(virref) from params.vir_ref_dir
-
-        output:
-        path("viralrefs") into virus_references
-        
-        script:
-        """
-        tar -xf $virref viralrefs
-        """
-    }
-}
-
-if (params.bact_ref_dir.endsWith('.gz') || params.bact_ref_dir.endsWith('.tar') || params.bact_ref_dir.endsWith('.tgz') {
-
-    process UNCOMPRESS_BACT_REF {
-        label 'error_retry'
-
-        input:
-        path(bactref) from params.bact_ref_dir
-
-        output:
-        path("bactrefs") into bacteria_references
-        
-        script:
-        """
-        tar -xf $bactref bactrefs
-        """
-    }
-}
-
-if (params.fungi_ref_dir.endsWith('.gz') || params.fungi_ref_dir.endsWith('.tar') || params.fungi_ref_dir.endsWith('.tgz') {
-
-    process UNCOMPRESS_FUNGI_REF {
-        label 'error_retry'
-
-        input:
-        path(fungiref) from params.fungi_ref_dir
-
-        output:
-        path("fungirefs") into fungi_references
-        
-        script:
-        """
-        tar -xf $fungiref fungirefs
-        """
-    }
 }
 
 /*
@@ -528,6 +472,7 @@ process RAW_SAMPLES_FASTQC {
 
 /*
  * STEP 1.2 - TRIMMING​​​​​​​
+*/
 if (params.trimming) {
     process FASTP {
         tag "$samplename"
@@ -636,8 +581,7 @@ if (params.kraken2krona) {
         """
         kreport2krona.py \\
         -r $report \\
-        -o ${samplename}.krona \\
-        --threads $task.cpus
+        -o ${samplename}.krona
         
         ktImportText \\
         -o ${samplename}.krona.html \\
@@ -648,6 +592,26 @@ if (params.kraken2krona) {
 
 if (params.virus) {
     
+    if (params.vir_ref_dir.endsWith('.gz') || params.vir_ref_dir.endsWith('.tar') || params.vir_ref_dir.endsWith('.tgz')) {
+
+        process UNCOMPRESS_VIR_REF {
+            label 'error_retry'
+
+            input:
+            path(virref) from params.vir_ref_dir
+
+            output:
+            path("viralrefs") into virus_references
+            
+            script:
+            viral_ref_name = "viralrefs"
+            """
+            mkdir $viral_ref_name
+            tar -xvf $virref --strip-components 1 -C $viral_ref_name
+            """
+        }
+    }
+
     process EXTRACT_KRAKEN2_VIRUS {
         tag "$samplename"
         label "process_medium"
@@ -691,7 +655,6 @@ if (params.virus) {
         """       
     } 
 
-    virus_reads_mapping.join(bowtie_virus_references).view()
 
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
@@ -705,8 +668,6 @@ if (params.virus) {
         script:
 
         """
-
-
         bowtie2-build \\
         --seed 1 \\
         --threads $task.cpus \\
@@ -717,81 +678,33 @@ if (params.virus) {
         bowtie2 \\
         -x
         -s
-
         """
-
-
-
     }
     
-    
-    process BOWTIE2_INDEX_BUILD_VIRUS {
-        tag "$basename"
-        label "process_medium"
-
-        input:
-        tuple val(sciname), file(fasta) from assemblies_virus
-
-        output:
-        tuple val(sciname), path("Bowtie2Index") into indexes_virus
-
-        script:
-        """
-        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv $sciname Bowtie2Index
-        """
-    }
-
-    process BOWTIE2_ALIGN_VIRUS {
-        tag "$basename"
-        label "process_high"
-
-        input:
-        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_virus_reads.combine(indexes_virus)
-
-        output:
-
-        script:
-        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-        sam_name = "${readname}_vs_${sciname}.sam"
-
-        """
-        bowtie2 \\
-        -x ${indexes}/${sciname} \\
-        -S $sam_name
-
-        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
-        """
-    }
-    */
 }
 
 if (params.bacteria) {
 
-    process GET_ASSEMBLIES_BACTERIA {
-        label "process_medium"
+    if (params.bact_ref_dir.endsWith('.gz') || params.bact_ref_dir.endsWith('.tar') || params.bact_ref_dir.endsWith('.tgz')) {
 
-        input:
-        tuple val(samplename),path(kraken2_report) from kraken2_report_bacteria_references
-        
-        output:
-        path("*_bacteria.tsv") into assemblies_data_bacteria
-        tuple val(samplename), path("*.fna") into bacteria_ref_assemblies
-        script:
-        
-        """       
-        wget -q -O assembly_summary_bacteria.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt'
-        extract_reference_assemblies.py $kraken2_report assembly_summary_bacteria.txt bacteria
-        
-        ./url_download_bacteria.sh
+        process UNCOMPRESS_BACT_REF {
+            label 'error_retry'
 
-        for compressedfile in ./*.gz
-        do
-            gzip -d \$compressedfile
-        done
-        """
+            input:
+            path(bactref) from params.bact_ref_dir
+
+            output:
+            path("bactrefs") into bacteria_references
+            
+            script:
+            bact_ref_name = "bactrefs"
+            """
+            mkdir $bact_ref_name
+            tar -xvf $bactref --strip-components 1 -C $bact_ref_name
+            """           
+        }
     }
+
 
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$samplename"
@@ -864,28 +777,24 @@ if (params.bacteria) {
 
 if (params.fungi) {
 
-    process GET_ASSEMBLIES_FUNGI {
-        label "process_medium"
+    if (params.fungi_ref_dir.endsWith('.gz') || params.fungi_ref_dir.endsWith('.tar') || params.fungi_ref_dir.endsWith('.tgz')) {
 
-        input:
-        tuple val(samplename),path(kraken2_report) from kraken2_report_fungi_references
-        
-        output:
-        path("*_fungi.tsv") into assemblies_data_fungi
-        tuple val(samplename), path("*.fna") into fungi_ref_assemblies
-        script:
-        
-        """       
-        wget -q -O assembly_summary_fungi.txt 'ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt'
-        extract_reference_assemblies.py $kraken2_report assembly_summary_fungi.txt fungi
-        
-        ./url_download_fungi.sh
+        process UNCOMPRESS_FUNGI_REF {
+            label 'error_retry'
 
-        for compressedfile in ./*.gz
-        do
-            gzip -d \$compressedfile
-        done
-        """
+            input:
+            path(fungiref) from params.fungi_ref_dir
+
+            output:
+            path("fungirefs") into fungi_references
+            
+            script:
+            fungi_ref_name = "fungirefs"
+            """
+            mkdir $fungi_ref_name
+            tar -xvf $fungiref --strip-components 1 -C $fungi_ref_name
+            """     
+        }
     }
 
     process EXTRACT_KRAKEN2_FUNGI {
@@ -957,7 +866,7 @@ if (params.fungi) {
 }
 
 /*
-* STEP 3.0 - Mapping
+STEP 3.0 - Mapping
 */
 process MAPPING_METASPADES {
     tag "$samplename"
@@ -965,7 +874,6 @@ process MAPPING_METASPADES {
 
     input:
     tuple val(samplename), val(single_end), path(reads) from unclassified_reads
-
 
     output:
     tuple val(samplename), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
