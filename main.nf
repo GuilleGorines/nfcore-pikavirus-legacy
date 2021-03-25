@@ -641,7 +641,7 @@ if (params.virus) {
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads) from virus_ref_selection
+        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from virus_ref_selection.combine(virus_references)
 
         output:
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
