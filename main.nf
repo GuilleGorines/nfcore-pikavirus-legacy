@@ -627,14 +627,14 @@ if (params.virus) {
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        output = single_end ? "--output ${samplename}_virus.fastq" : "-o1 ${samplename}_virus_1.fastq -o2 ${samplename}_virus_2.fastq"
+        outputfile = single_end ? "--output ${samplename}_virus.fastq" : "-o ${samplename}_virus_1.fastq -o2 ${samplename}_virus_2.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
         -r $report \\
         --taxid 10239 \\
         $read \\
-        $output
+        $outputfile
         """
     }
     
@@ -720,14 +720,14 @@ if (params.bacteria) {
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        filename = "${samplename}_bacteria.fastq"
+        outputfile = single_end ? "--output ${samplename}_bact.fastq" : "-o ${samplename}_bact_1.fastq -o2 ${samplename}_bact_2.fastq"
         """
         extract_kraken_reads.py \\
         -k ${output} \\
         -r ${report} \\
         --taxid 2 \\
         ${read} \\
-        --output ${filename}
+        ${outputfile}
         """
     }
 
@@ -811,7 +811,7 @@ if (params.fungi) {
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        filename = "${samplename}_fungi.fastq"
+        outputfile = single_end ? "--output ${samplename}_fungi.fastq" : "-o ${samplename}_fungi_1.fastq -o2 ${samplename}_fungi_2.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
