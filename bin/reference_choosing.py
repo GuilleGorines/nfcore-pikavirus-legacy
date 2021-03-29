@@ -1,12 +1,13 @@
+#!/usr/bin/env python
+
 import sys
 import os
 import subprocess
-from pathlib import Path
 
 krakenrep = sys.argv[1]
-refdir = Path(sys.argv[2])
+refdir = sys.argv[2]
 query = sys.argv[3]
-threads = 1
+threads = sys.argv[4]
 
 with open(krakenrep) as krakenreport:
     krakenreport = [line.split("\t") for line in krakenreport.readlines()]

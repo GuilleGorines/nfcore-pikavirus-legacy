@@ -103,6 +103,7 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 summary['Input']            = params.input
 summary['Trimming']         = params.trimming
 summary['Kraken2 database'] = params.kraken2_db
+summary ['Kaiju database']  = params.kaiju_db
 summary['Virus Search']     = params.virus
 if (params.virus) summary['    Virus Ref'] = params.vir_ref_dir
 summary['Bacteria Search']  = params.bacteria
@@ -568,9 +569,7 @@ if (params.kraken2krona) {
     process KRONA_KRAKEN_RESULTS {
         tag "$samplename"
         label "process_medium"
-        publishDir "${resultsDir}/kraken2_results", mode: params.publish_dir_mode,
-        saveAs: { filename ->
-                    filename.indexOf(".krona.html") > 0 ? "kraken2_krona_result/$filename" : "$filename"}
+        publishDir "${params.outdir}/kraken2_krona_results", mode: params.publish_dir_mode
 
 
         input:
@@ -906,13 +905,13 @@ process QUAST_EVALUATION {
     tuple val(samplename), file(contig) from contigs_quast
 
     output:
-    file("/quast_results/report.html") into quast_results
+    file("quast_results/report.html") into quast_results
 
     script:
 
     """
     metaquast.py \\
-    -f $contigs \\
+    -f $contig \\
     -o quast_results
     """
 }
