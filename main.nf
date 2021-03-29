@@ -633,6 +633,7 @@ if (params.virus) {
         -k $output \\
         -r $report \\
         --taxid 10239 \\
+        --include-children \\
         $read \\
         $outputfile
         """
@@ -728,6 +729,7 @@ if (params.bacteria) {
         -k ${output} \\
         -r ${report} \\
         --taxid 2 \\
+        --include-children \\
         ${read} \\
         ${outputfile}
         """
@@ -820,6 +822,7 @@ if (params.fungi) {
         -k $output \\
         -r $report \\
         --taxid 4751 \\
+        --include-children \\
         $read \\
         --output $filename
         """
@@ -896,7 +899,7 @@ process MAPPING_METASPADES {
 
 /*
 * STEP 3.1 - Evaluating assembly
-*/
+
 process QUAST_EVALUATION {
     tag "$samplename"
     label "process_medium"
@@ -915,6 +918,7 @@ process QUAST_EVALUATION {
     -o quast_results
     """
 }
+*/
 
 /*
 * STEP 4 - Contig search with kaiju

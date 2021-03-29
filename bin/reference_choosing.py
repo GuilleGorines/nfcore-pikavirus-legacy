@@ -50,6 +50,6 @@ os.mkdir(f"Chosen_fnas", 0o777)
 for taxid,mashresults in mashdict.items():
     true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
     for fna in true_mashresults:
-        filename = fna[0].split("\t")[-1]
+        filename = fna[0].split("\t")[-1].split("/")[1]
         os.replace(fna[0],f"Chosen_fnas/{filename}")
 
