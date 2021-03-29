@@ -622,8 +622,8 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_virus.join(kraken2_virus_extraction)
 
         output:
-        tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
-        tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into virus_ref_selection
+        tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
+        tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
@@ -643,7 +643,7 @@ if (params.virus) {
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from virus_ref_selection.combine(virus_references)
+        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from vir_ref_selection.combine(virus_references)
 
         output:
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
@@ -717,6 +717,8 @@ if (params.bacteria) {
 
         output:
         tuple val(samplename), val(single_end), path("*_bact_extracted.fastq") into bacteria_reads_mapping
+        tuple val(samplename), val(single_end), path(report), path("*_bact_extracted.fastq") into bact_ref_selection
+
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
@@ -808,6 +810,7 @@ if (params.fungi) {
 
         output:
         tuple val(samplename), val(single_end), file("*_fungi_extracted.fastq") into fungi_reads_mapping
+        tuple val(samplename), val(single_end), path(report), path("*_fungi_extracted.fastq") into fungi_ref_selection
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
