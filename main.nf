@@ -664,23 +664,31 @@ if (params.virus) {
         label "process_high"
         
         input:
-        tuple val(samplename), val(single_end), path(reads), path(reference) from virus_reads_mapping.join(bowtie_virus_references)
+        tuple val(samplename), val(single_end), path(reads), path(references) from virus_reads_mapping.join(bowtie_virus_references)
         
         output:
-        
+        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_virus
         script:
-
+        samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        
         """
-        bowtie2-build \\
-        --seed 1 \\
-        --threads $task.cpus \\
-        $fasta \\
-        $sciname \\
-        mkdir Bowtie2Index && mv $sciname Bowtie2Index
+        for ref in $references:
+        do
+            refname = "\$(basename --\$ref)"
+            sam_name = "${refname}_vs_${samplename}.sam"
 
-        bowtie2 \\
-        -x
-        -s
+            bowtie2-build \\
+            --seed 1 \\
+            --threads $task.cpus \\
+            $reference \\
+            \$refname
+
+            bowtie2 \\
+            -x \$refname \\
+            ${samplereads} \\
+            -S "${sam_name} \\
+            --threads $task.cpus
+        done
         """
     }
     
