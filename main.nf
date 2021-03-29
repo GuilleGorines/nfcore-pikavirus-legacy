@@ -102,6 +102,7 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
 summary['Trimming']         = params.trimming
+summary['Kraken2 database'] = params.kraken2_db
 summary['Virus Search']     = params.virus
 if (params.virus) summary['    Virus Ref'] = params.vir_ref_dir
 summary['Bacteria Search']  = params.bacteria
