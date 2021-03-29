@@ -623,11 +623,11 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus.fastq") into virus_reads_mapping
-        tuple val(samplename), val(single_end), path(report), path("*_virus.fastq") into virus_ref_selection
+        tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into virus_ref_selection
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        outputfile = single_end ? "--output ${samplename}_virus.fastq" : "-o ${samplename}_virus_1.fastq -o2 ${samplename}_virus_2.fastq"
+        outputfile = single_end ? "--output ${samplename}_virus_extracted.fastq" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
@@ -716,11 +716,11 @@ if (params.bacteria) {
         tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_bacteria.join(kraken2_bacteria_extraction)
 
         output:
-        tuple val(samplename), val(single_end), path("*_bacteria.fastq") into bacteria_reads_mapping
+        tuple val(samplename), val(single_end), path("*_bact_extracted.fastq") into bacteria_reads_mapping
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        outputfile = single_end ? "--output ${samplename}_bact.fastq" : "-o ${samplename}_bact_1.fastq -o2 ${samplename}_bact_2.fastq"
+        outputfile = single_end ? "--output ${samplename}_bact_extracted.fastq" : "-o ${samplename}_1_bact_extracted.fastq -o2 ${samplename}_2_bact_extracted.fastq"
         """
         extract_kraken_reads.py \\
         -k ${output} \\
@@ -807,11 +807,11 @@ if (params.fungi) {
         tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_fungi.join(kraken2_fungi_extraction)
 
         output:
-        tuple val(samplename), val(single_end), file("*_fungi.fastq") into fungi_reads_mapping
+        tuple val(samplename), val(single_end), file("*_fungi_extracted.fastq") into fungi_reads_mapping
 
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        outputfile = single_end ? "--output ${samplename}_fungi.fastq" : "-o ${samplename}_fungi_1.fastq -o2 ${samplename}_fungi_2.fastq"
+        outputfile = single_end ? "--output ${samplename}_fungi_extracted.fastq" : "-o ${samplename}1_fungi_extracted.fastq -o2 ${samplename}_2_fungi_extracted.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
