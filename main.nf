@@ -609,7 +609,7 @@ if (params.virus) {
             viral_ref_name = "viralrefs"
             """
             mkdir $viral_ref_name
-            tar -xvf $virref -C $viral_ref_name
+            tar -xvf $virref --strip-components=1 -C $viral_ref_name
             """
         }
     }
@@ -711,7 +711,7 @@ if (params.bacteria) {
             bact_ref_name = "bactrefs"
             """
             mkdir $bact_ref_name
-            tar -xvf $bactref -C $bact_ref_name
+            tar -xvf $bactref --strip-components=1 -C $bact_ref_name
             """           
         }
     }
@@ -806,7 +806,7 @@ if (params.fungi) {
             fungi_ref_name = "fungirefs"
             """
             mkdir $fungi_ref_name
-            tar -xvf $fungiref -C $fungi_ref_name
+            tar -xvf $fungiref --strip-components=1 -C $fungi_ref_name
             """     
         }
     }
