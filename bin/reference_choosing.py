@@ -47,9 +47,20 @@ for taxid,reffiles in filedict.items():
 
 os.mkdir(f"Chosen_fnas", 0o777)
 
-for taxid,mashresults in mashdict.items():
-    true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
-    for fna in true_mashresults:
-        filename = fna[0].split("\t")[-1].split("/")[1]
-        os.replace(fna[0],f"Chosen_fnas/{filename}")
+with open("mash_results.txt","w") as outfile:
+    outfile.write("Taxid\tReference file\tMash-distance\tP-value\tMatching_hashes\tChosen\n")
+    for taxid,mashresults in mashdict.items():
+        for result in mashresults:
+            if float(mashresults[3]) < 0.05:
+                chosen = "Yes"
+            else:
+                chosen = "No"
+            out_line = f"{taxid}\t{mashresults[0]}\t{mashresults[2]}\t{mashresults[3]}\t{mashresults[4]}\t{chosen}\n"
+            outfile.write(out_line)
+
+
+        true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
+        for fna in true_mashresults:
+            filename = fna[0].split("\t")[-1].split("/")[1]
+            os.replace(fna[0],f"Chosen_fnas/{filename}")
 
