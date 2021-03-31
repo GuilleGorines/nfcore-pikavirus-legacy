@@ -63,5 +63,5 @@ with open("mash_results.txt","w") as outfile:
         true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
         for fna in true_mashresults:
             filename = fna[0].split("\t")[-1].split("/")[1]
-            os.replace(fna[0],f"Chosen_fnas/{filename}")
+            os.symlink(fna[0],f"Chosen_fnas/{filename}")
 
