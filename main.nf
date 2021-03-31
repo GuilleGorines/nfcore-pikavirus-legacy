@@ -388,7 +388,7 @@ process CAT_FASTQ {
         }
     } else {
         if (readList.size > 1) {
-            """​​​​​​​Human alphaherpesvirus
+            """​​​​​​​
             cat ${readList.sort().join(' ')} > ${sample}.merged.fastq.gz
             """
         } else {
@@ -445,7 +445,7 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || param
         """
     }
 } else {
-    kaiju_db = params.kaiju_db
+    kaiju_db = Channel.fromPath(params.kaiju_db)
 }
 
 /*
@@ -612,6 +612,8 @@ if (params.virus) {
             tar -xvf $virref --strip-components=1 -C $viral_ref_name
             """
         }
+    } else {
+        virus_references = Channel.fromPath(params.vir_ref_dir)
     }
 
     process EXTRACT_KRAKEN2_VIRUS {
@@ -650,8 +652,8 @@ if (params.virus) {
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}" 
+        queryname = single_end ? "${reads}" : "${samplename}.fastq"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
         """
         $merging \\
         reference_choosing.py $report $refdir $queryname $task.cpus
@@ -672,7 +674,21 @@ if (params.virus) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-        for ref in $references:
+
+        echo $references
+
+
+        """
+    }
+    
+}
+
+
+
+
+
+/*
+        for \$ref in $references
         do
     
             bowtie2-build \\
@@ -688,10 +704,11 @@ if (params.virus) {
             --threads $task.cpus
 
         done
-        """
-    }
-    
-}
+
+*/
+
+
+
 
 if (params.bacteria) {
 
