@@ -64,4 +64,3 @@ with open("mash_results.txt","w") as outfile:
         for fna in true_mashresults:
             filename = fna[0].split("\t")[-1].split("/")[1]
             shutil.copyfile(fna[0],f"Chosen_fnas/{filename}")
-

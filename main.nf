@@ -636,6 +636,7 @@ if (params.virus) {
         -r $report \\
         --taxid 10239 \\
         --include-children \\
+        --fastq-output \\
         $read \\
         $outputfile
         """
@@ -655,7 +656,7 @@ if (params.virus) {
         queryname = single_end ? "${reads}" : "${samplename}.fastq"
         merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
         """
-        $merging \\
+        $merging
         reference_choosing.py $report $refdir $queryname $task.cpus
         """       
     } 
@@ -674,10 +675,20 @@ if (params.virus) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
+        for ref in $references
+        do
+            bowtie2-build \\
+            --seed 1 \\
+            --threads $task.cpus \\
+            \$ref \\
+            "\$(basename \$ref)"
 
-        echo $references
-
-
+            bowtie2 \\
+            -x "\$(basename \$ref)"\\
+            $samplereads \\
+            -S "\$(basename \$ref)_vs_${samplename}.sam"\\
+            --threads $task.cpus
+        done
         """
     }
     
@@ -688,22 +699,7 @@ if (params.virus) {
 
 
 /*
-        for \$ref in $references
-        do
-    
-            bowtie2-build \\
-            --seed 1 \\
-            --threads $task.cpus \\
-            $ref \\
-            "\$(basename \$ref)"
 
-            bowtie2 \\
-            -x \$refname \\
-            ${samplereads} \\
-            -S "\$(basename \$ref)"_vs_${samplename}"\\
-            --threads $task.cpus
-
-        done
 
 */
 
@@ -754,6 +750,7 @@ if (params.bacteria) {
         -r ${report} \\
         --taxid 2 \\
         --include-children \\
+        --fastq-output \\
         ${read} \\
         ${outputfile}
         """
@@ -847,6 +844,7 @@ if (params.fungi) {
         -r $report \\
         --taxid 4751 \\
         --include-children \\
+        --fastq-output \\
         $read \\
         --output $filename
         """
