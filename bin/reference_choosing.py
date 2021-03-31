@@ -3,6 +3,7 @@
 import sys
 import os
 import subprocess
+import shutil
 
 krakenrep = sys.argv[1]
 refdir = sys.argv[2]
@@ -45,7 +46,6 @@ for taxid,reffiles in filedict.items():
                 mashcommand = subprocess.run(fullprocess, stdout=subprocess.PIPE)
                 mashdict[taxid].append(mashcommand.stdout.decode("utf8").replace("\n","").split("\t"))
 
-print(mashdict)
 os.mkdir(f"Chosen_fnas", 0o777)
 
 with open("mash_results.txt","w") as outfile:
@@ -63,5 +63,5 @@ with open("mash_results.txt","w") as outfile:
         true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
         for fna in true_mashresults:
             filename = fna[0].split("\t")[-1].split("/")[1]
-            os.symlink(fna[0],f"Chosen_fnas/{filename}")
+            shutil.copyfile(fna[0],f"Chosen_fnas/{filename}")
 
