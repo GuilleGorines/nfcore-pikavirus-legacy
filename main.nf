@@ -420,7 +420,7 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
         """
     }
 } else {
-    kraken2_db_files = params.kraken2_db
+    kraken2_db_files = Channel.fromPath(params.kraken2_db)
 }
 
 /*
@@ -536,9 +536,8 @@ process SCOUT_KRAKEN2 {
     tag "$samplename"
     label "process_high"
 
-    input:
-    path(kraken2db) from kraken2_db_files
-    tuple val(samplename), val(single_end), path(reads) from trimmed_paired_kraken2
+    input: 
+    tuple val(samplename), val(single_end), path(reads),path(kraken2db) from trimmed_paired_kraken2.combine(kraken2_db_files)
 
     output:
     tuple val(samplename), path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
@@ -630,6 +629,7 @@ if (params.virus) {
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
         outputfile = single_end ? "--output ${samplename}_virus_extracted.fastq" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
+
         """
         extract_kraken_reads.py \\
         -k $output \\
@@ -693,18 +693,6 @@ if (params.virus) {
     }
     
 }
-
-
-
-
-
-/*
-
-
-*/
-
-
-
 
 if (params.bacteria) {
 
@@ -950,8 +938,7 @@ process KAIJU {
     label "process_high"
 
     input:
-    tuple val(samplename), file(contig) from contigs
-    path(kaijudb) from kaiju_db
+    tuple val(samplename), file(contig), path(kaijudb) from contigs.combine(kaiju_db)
 
     output:
     tuple val(samplename), path("*_kaiju.out") into kaiju_results
