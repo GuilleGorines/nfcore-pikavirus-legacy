@@ -674,20 +674,19 @@ if (params.virus) {
         """
         for ref in $references:
         do
-            refname = "\$(basename --\$ref)"
-            sam_name = "${refname}_vs_${samplename}.sam"
-
+    
             bowtie2-build \\
             --seed 1 \\
             --threads $task.cpus \\
-            $reference \\
-            \$refname
+            $ref \\
+            "\$(basename \$ref)"
 
             bowtie2 \\
             -x \$refname \\
             ${samplereads} \\
-            -S "${sam_name} \\
+            -S "\$(basename \$ref)"_vs_${samplename}"\\
             --threads $task.cpus
+
         done
         """
     }
