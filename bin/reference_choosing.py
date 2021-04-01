@@ -3,6 +3,7 @@
 import sys
 import os
 import subprocess
+import shutil
 
 krakenrep = sys.argv[1]
 refdir = sys.argv[2]
@@ -51,16 +52,15 @@ with open("mash_results.txt","w") as outfile:
     outfile.write("Taxid\tReference file\tMash-distance\tP-value\tMatching_hashes\tChosen\n")
     for taxid,mashresults in mashdict.items():
         for result in mashresults:
-            if float(mashresults[3]) < 0.05:
+            if float(result[3]) < 0.05:
                 chosen = "Yes"
             else:
                 chosen = "No"
-            out_line = f"{taxid}\t{mashresults[0]}\t{mashresults[2]}\t{mashresults[3]}\t{mashresults[4]}\t{chosen}\n"
+            out_line = f"{taxid}\t{result[0]}\t{result[2]}\t{result[3]}\t{result[4]}\t{chosen}\n"
             outfile.write(out_line)
 
 
         true_mashresults = [result for result in mashresults if float(result[3]) < 0.05]
         for fna in true_mashresults:
             filename = fna[0].split("\t")[-1].split("/")[1]
-            os.replace(fna[0],f"Chosen_fnas/{filename}")
-
+            shutil.copyfile(fna[0],f"Chosen_fnas/{filename}")

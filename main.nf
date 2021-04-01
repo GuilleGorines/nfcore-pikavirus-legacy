@@ -389,7 +389,7 @@ process CAT_FASTQ {
         }
     } else {
         if (readList.size > 1) {
-            """​​​​​​​Human alphaherpesvirus
+            """​​​​​​​
             cat ${readList.sort().join(' ')} > ${sample}.merged.fastq.gz
             """
         } else {
@@ -421,7 +421,7 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
         """
     }
 } else {
-    kraken2_db_files = params.kraken2_db
+    kraken2_db_files = Channel.fromPath(params.kraken2_db)
 }
 
 /*
@@ -446,7 +446,7 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || param
         """
     }
 } else {
-    kaiju_db = params.kaiju_db
+    kaiju_db = Channel.fromPath(params.kaiju_db)
 }
 
 /*
@@ -537,9 +537,8 @@ process SCOUT_KRAKEN2 {
     tag "$samplename"
     label "process_high"
 
-    input:
-    path(kraken2db) from kraken2_db_files
-    tuple val(samplename), val(single_end), path(reads) from trimmed_paired_kraken2
+    input: 
+    tuple val(samplename), val(single_end), path(reads),path(kraken2db) from trimmed_paired_kraken2.combine(kraken2_db_files)
 
     output:
     tuple val(samplename), path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
@@ -613,6 +612,8 @@ if (params.virus) {
             tar -xvf $virref --strip-components=1 -C $viral_ref_name
             """
         }
+    } else {
+        virus_references = Channel.fromPath(params.vir_ref_dir)
     }
 
     process EXTRACT_KRAKEN2_VIRUS {
@@ -629,12 +630,14 @@ if (params.virus) {
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
         outputfile = single_end ? "--output ${samplename}_virus_extracted.fastq" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
+
         """
         extract_kraken_reads.py \\
         -k $output \\
         -r $report \\
         --taxid 10239 \\
         --include-children \\
+        --fastq-output \\
         $read \\
         $outputfile
         """
@@ -651,10 +654,10 @@ if (params.virus) {
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}" 
+        queryname = single_end ? "${reads}" : "${samplename}.fastq"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
         """
-        $merging \\
+        $merging
         reference_choosing.py $report $refdir $queryname $task.cpus
         """       
     } 
@@ -673,21 +676,32 @@ if (params.virus) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
+<<<<<<< HEAD
         for ref in $references;
         do
             refname = "\$(basename -- \$ref)"
             bam_name = "${refname}_vs_${samplename}.bam"
 
+=======
+        for ref in $references
+        do
+>>>>>>> 077e1322baf08903a04456c12df3f2a772930938
             bowtie2-build \\
             --seed 1 \\
             --threads $task.cpus \\
-            $reference \\
-            \$refname
+            \$ref \\
+            "\$(basename \$ref)"
 
             bowtie2 \\
+<<<<<<< HEAD
             -x \$refname \\
             ${samplereads} \\
             -b \${bam_name} \\
+=======
+            -x "\$(basename \$ref)"\\
+            $samplereads \\
+            -S "\$(basename \$ref)_vs_${samplename}.sam"\\
+>>>>>>> 077e1322baf08903a04456c12df3f2a772930938
             --threads $task.cpus
         done
         """
@@ -769,6 +783,7 @@ if (params.bacteria) {
         -r ${report} \\
         --taxid 2 \\
         --include-children \\
+        --fastq-output \\
         ${read} \\
         ${outputfile}
         """
@@ -861,6 +876,7 @@ if (params.fungi) {
         -r $report \\
         --taxid 4751 \\
         --include-children \\
+        --fastq-output \\
         $read \\
         --output $filename
         """
@@ -966,8 +982,7 @@ process KAIJU {
     label "process_high"
 
     input:
-    tuple val(samplename), file(contig) from contigs
-    path(kaijudb) from kaiju_db
+    tuple val(samplename), file(contig), path(kaijudb) from contigs.combine(kaiju_db)
 
     output:
     tuple val(samplename), path("*_kaiju.out") into kaiju_results
