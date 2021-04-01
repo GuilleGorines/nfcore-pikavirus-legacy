@@ -21,3 +21,4 @@ dependencies:
   - bioconda::kaiju=1.7.4
   - bioconda::bowtie2=2.4.2
   - bioconda::mash=2.3
+  - bioconda::bedtools=2.30.0

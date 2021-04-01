@@ -180,6 +180,7 @@ process get_software_versions {
     kaiju -help 2>&1 v_kaiju.txt &
     bowtie2 --version > v_bowtie2.txt
     mash -v | grep version > v_mash.txt
+    bedtools -version > v_bedtools.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
@@ -658,7 +659,6 @@ if (params.virus) {
         """       
     } 
 
-
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
         label "process_high"
@@ -667,15 +667,16 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(reads), path(references) from virus_reads_mapping.join(bowtie_virus_references)
         
         output:
-        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_virus
+        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_bam_virus
+
         script:
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-        for ref in $references:
+        for ref in $references;
         do
-            refname = "\$(basename --\$ref)"
-            sam_name = "${refname}_vs_${samplename}.sam"
+            refname = "\$(basename -- \$ref)"
+            bam_name = "${refname}_vs_${samplename}.bam"
 
             bowtie2-build \\
             --seed 1 \\
@@ -686,10 +687,40 @@ if (params.virus) {
             bowtie2 \\
             -x \$refname \\
             ${samplereads} \\
-            -S "${sam_name} \\
+            -b \${bam_name} \\
             --threads $task.cpus
         done
         """
+    }
+
+    process BEDTOOLS_COVERAGE_VIRUS {
+        tag "$samplename"
+        label "process_medium"
+
+        input:
+        tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_virus
+
+        output:
+
+        script:
+
+        """
+        for bam in $bamfiles;
+        do  
+            genomeLength = "\$(basename --\$bam)_length.txt"
+            genomeCoverage = "\$(basename --\$bam)_coverage.txt"
+            genomeGraph = "\$(basename --\$bam)_bedgraph.txt"
+
+            bedtools genomecov -ibam \$bam -g \$genomeLength > \$genomeCoverage
+            bedtools genomecov -ibam \$bam -g \$genomeLength -bga > \$genomeGraph           
+        done
+
+        graphs_coverage.py *_coverage.txt
+
+        """
+
+
+
     }
     
 }
@@ -743,7 +774,6 @@ if (params.bacteria) {
         """
     }
 
-    bacteria_reads_mapping.join(bacteria_ref_assemblies).view()
 
     /*
     process BOWTIE2_INDEX_BUILD_BACTERIA {
