@@ -676,16 +676,11 @@ if (params.virus) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-<<<<<<< HEAD
         for ref in $references;
         do
             refname = "\$(basename -- \$ref)"
             bam_name = "${refname}_vs_${samplename}.bam"
 
-=======
-        for ref in $references
-        do
->>>>>>> 077e1322baf08903a04456c12df3f2a772930938
             bowtie2-build \\
             --seed 1 \\
             --threads $task.cpus \\
@@ -693,15 +688,9 @@ if (params.virus) {
             "\$(basename \$ref)"
 
             bowtie2 \\
-<<<<<<< HEAD
             -x \$refname \\
             ${samplereads} \\
             -b \${bam_name} \\
-=======
-            -x "\$(basename \$ref)"\\
-            $samplereads \\
-            -S "\$(basename \$ref)_vs_${samplename}.sam"\\
->>>>>>> 077e1322baf08903a04456c12df3f2a772930938
             --threads $task.cpus
         done
         """
