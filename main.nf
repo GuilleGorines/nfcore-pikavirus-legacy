@@ -678,8 +678,6 @@ if (params.virus) {
         """
         for ref in $references;
         do
-            refname = "\$(basename -- \$ref)"
-            bam_name = "${refname}_vs_${samplename}.bam"
 
             bowtie2-build \\
             --seed 1 \\
@@ -688,9 +686,9 @@ if (params.virus) {
             "\$(basename \$ref)"
 
             bowtie2 \\
-            -x \$refname \\
+            -x "\$(basename \$ref)" \\
             ${samplereads} \\
-            -b \${bam_name} \\
+            -S "\$(basename -- \$ref)_vs_${samplename}.sam" \\
             --threads $task.cpus
         done
         """
@@ -710,12 +708,9 @@ if (params.virus) {
         """
         for bam in $bamfiles;
         do  
-            genomeLength = "\$(basename --\$bam)_length.txt"
-            genomeCoverage = "\$(basename --\$bam)_coverage.txt"
-            genomeGraph = "\$(basename --\$bam)_bedgraph.txt"
-
-            bedtools genomecov -ibam \$bam -g \$genomeLength > \$genomeCoverage
-            bedtools genomecov -ibam \$bam -g \$genomeLength -bga > \$genomeGraph           
+       
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage.txt"
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph.txt"       
         done
 
         graphs_coverage.py *_coverage.txt
@@ -927,7 +922,7 @@ process MAPPING_METASPADES {
     tuple val(samplename), val(single_end), path(reads) from unclassified_reads
 
     output:
-    tuple val(samplename), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
+    tuple val(samplename), path("metaspades_result/*_contigs.fasta") into contigs, contigs_quast
 
     script:
     read = single_end ? "-s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
@@ -937,6 +932,10 @@ process MAPPING_METASPADES {
     $read \\
     --threads $task.cpus \\
     -o metaspades_result
+
+    mv metaspades_result/contigs.fasta metaspades_result/${samplename}_contigs.fasta
+
+    
     """
 }
 
