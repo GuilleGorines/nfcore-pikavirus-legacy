@@ -702,7 +702,7 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
 
         output:
-        tuple val(samplename), val(single_end), path(".sorted.bam") into ordered_bam_files_virus
+        tuple val(samplename), val(single_end), path(".sorted.bam") into bowtie_alingment_bam_virus
         tuple val(samplename), val(single_end), path(".sorted.bam.flagstat"), path(".sorted.bam.idxstats"), path(".sorted.bam.stats") into bam_stats_virus
         script:
 
