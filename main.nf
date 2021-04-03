@@ -180,6 +180,7 @@ process get_software_versions {
     kaiju -help 2>&1 v_kaiju.txt &
     bowtie2 --version > v_bowtie2.txt
     mash -v | grep version > v_mash.txt
+    samtools --version | grep samtools > v_samtools.txt
     bedtools -version > v_bedtools.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
@@ -670,7 +671,7 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(reads), path(references) from virus_reads_mapping.join(bowtie_virus_references)
         
         output:
-        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_bam_virus
+        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_sam_virus
 
         script:
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
@@ -678,9 +679,7 @@ if (params.virus) {
         """
         for ref in $references;
         do
-            refname = "\$(basename -- \$ref)"
-            bam_name = "${refname}_vs_${samplename}.bam"
-
+        
             bowtie2-build \\
             --seed 1 \\
             --threads $task.cpus \\
@@ -688,13 +687,54 @@ if (params.virus) {
             "\$(basename \$ref)"
 
             bowtie2 \\
-            -x \$refname \\
+            -x "\$(basename -- \$ref)" \\
             ${samplereads} \\
-            -b \${bam_name} \\
+            -b "\$(basename -- \$ref)_vs_${samplename}.bam" \\
             --threads $task.cpus
         done
         """
     }
+
+    process SAMTOOLS_BAM_FROM_SAM {
+        tag "$samplename"
+        label "process_medium"
+
+        input:
+        tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
+
+        output:
+        tuple val(samplename), val(single_end), path(".sorted.bam") into ordered_bam_files_virus
+        tuple val(samplename), val(single_end), path(".sorted.bam.flagstat"), path(".sorted.bam.idxstats"), path(".sorted.bam.stats") into bam_stats_virus
+        script:
+
+        """
+        for sam in $samfiles;
+        do
+            samtools view \\
+            -@ $task.cpus \\
+            -b \\
+            -h \\
+            -F4 \\
+            -O BAM \\
+            -o "\$(basename \${sam} .sam).bam"
+
+            samtools sort \\
+            -@ $task.cpus \\
+            -o "\$(basename \${sam} .sam).sorted.bam" \\
+            "\$(basename \${sam} .sam).bam"
+
+            samtools index "\$(basename \${sam} .sam).sorted.bam"
+
+            samtools flagstat "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.flagstat"
+            samtools idxstats "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.idxstats"
+            samtools stats "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.stats"
+
+        done
+        """
+
+
+
+    
 
     process BEDTOOLS_COVERAGE_VIRUS {
         tag "$samplename"
@@ -721,9 +761,6 @@ if (params.virus) {
         graphs_coverage.py *_coverage.txt
 
         """
-
-
-
     }
     
 }
