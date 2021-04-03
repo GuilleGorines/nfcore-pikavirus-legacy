@@ -702,8 +702,8 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
 
         output:
-        tuple val(samplename), val(single_end), path(".sorted.bam") into bowtie_alingment_bam_virus
-        tuple val(samplename), val(single_end), path(".sorted.bam.flagstat"), path(".sorted.bam.idxstats"), path(".sorted.bam.stats") into bam_stats_virus
+        tuple val(samplename), val(single_end), path("*.sorted.bam") into bowtie_alingment_bam_virus
+        tuple val(samplename), val(single_end), path("*.sorted.bam.flagstat"), path("*.sorted.bam.idxstats"), path("*.sorted.bam.stats") into bam_stats_virus
         script:
 
         """
@@ -752,10 +752,7 @@ if (params.virus) {
        
             bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage.txt"
             bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph.txt"       
-        done
-
-        graphs_coverage.py *_coverage.txt
-
+        done      
         """
     }
     
