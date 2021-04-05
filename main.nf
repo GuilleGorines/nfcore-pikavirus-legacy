@@ -1008,7 +1008,7 @@ process KAIJU {
     tuple val(samplename), file(contig), path(kaijudb) from contigs.combine(kaiju_db)
 
     output:
-    tuple val(samplename), path("*_kaiju.out") into kaiju_results
+    tuple val(samplename), path("*.out") into kaiju_results
 
     script:
 
@@ -1020,6 +1020,22 @@ process KAIJU {
     -o ${samplename}_kaiju.out \\
     -z $task.cpus \\
     -v
+
+    kaiju2table \\
+    -t $kaijudb/nodes.dmp \\
+    -n $kaijudb/names.dmp \\
+    -r species \\
+    -o ${samplename}_kaiju_summary.tsv \\
+    ${samplename}_kaiju.out
+
+
+
+    kaiju-addTaxonNames \\
+    -t $kaijudb/nodes.dmp \\
+    -n $kaijudb/names.dmp \\
+    -i ${samplename}_kaiju.out \\
+    -o ${samplename}_kaiju.names.out
+
     """
 }
 
