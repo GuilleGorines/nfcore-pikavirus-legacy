@@ -715,7 +715,8 @@ if (params.virus) {
             -h \\
             -F4 \\
             -O BAM \\
-            -o "\$(basename \${sam} .sam).bam"
+            -o "\$(basename \${sam} .sam).bam" \\
+            \$sam
 
             samtools sort \\
             -@ $task.cpus \\
@@ -730,7 +731,6 @@ if (params.virus) {
 
         done
         """
-
     }
 
     process BEDTOOLS_COVERAGE_VIRUS {
