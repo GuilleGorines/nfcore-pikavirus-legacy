@@ -733,8 +733,6 @@ if (params.virus) {
 
     }
 
-    
-
     process BEDTOOLS_COVERAGE_VIRUS {
         tag "$samplename"
         label "process_medium"
@@ -743,15 +741,15 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_virus
 
         output:
+        tuple path("*_coverage.txt"), path("*_bedgraph.txt") into bedtools_coverage_files_virus
 
         script:
 
         """
         for bam in $bamfiles;
         do  
-       
             bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage.txt"
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph.txt"       
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph.txt"     
         done      
         """
     }
