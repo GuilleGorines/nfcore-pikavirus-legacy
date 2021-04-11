@@ -28,7 +28,7 @@ try:
     with open(blastfile) as infile:
         infile=infile.readlines()
 
-    with open(coveragefile) as coverage
+    with open(coveragefile) as coverage:
         coverage=coverage.readlines()
 
 except IOError:
@@ -53,7 +53,7 @@ for line in infile:
     contig_percentage=int(line[4]/contig_len*10000)/100
 
     if contig_percentage > 90:
-        data=f"{genome}\t{sys.exi()blast_score}\t{contig_len}\t{contig_percentage}\t{coverdict[{contig}]}\n"
+        data=f"{genome}\t{blast_score}\t{contig_len}\t{contig_percentage}\t{coverdict[{contig}]}\n"
         lastfile.write(data)
 
 exit
