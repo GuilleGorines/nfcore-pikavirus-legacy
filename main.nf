@@ -529,7 +529,7 @@ if (params.trimming) {
 
         output:
         file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
-        tuple val(samplename), val(single_end), path("*.txt") into post_filter_quality_data
+        tuple val(samplename), path("*.txt") into post_filter_quality_data
 
         script:
         
@@ -1060,9 +1060,10 @@ process EXTRACT_QUALITY_RESULTS {
 
     script:
     txtname = "${samplename}_quality.txt"
+    isit_single_end = single_end ? "True" : "False"
 
     """
-    extract_fastqc_data.py $samplename $single_end $pre_filter_data $post_filter_data  > $txtname
+    extract_fastqc_data.py $samplename $isit_single_end $pre_filter_data $post_filter_data  > $txtname
 
     """
 }
