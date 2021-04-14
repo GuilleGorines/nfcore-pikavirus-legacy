@@ -287,7 +287,6 @@ if (!params.skip_sra || !isOffline()) {
 
         output:
         tuple val(sample), val(single_end), val(is_sra), val(is_ftp), path("*.fastq.gz") into ch_sra_fastq_ftp
-        path "*.md5"
 
         script:
         if (single_end) {
@@ -466,11 +465,19 @@ process RAW_SAMPLES_FASTQC {
 
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
+    tuple val(samplename), val(single_end), path("*.txt") into pre_filter_quality_data
+
 
     script:
 
     """
-    fastqc --quiet --threads $task.cpus *.fastq.gz
+    fastqc --quiet --threads $task.cpus $reads
+
+    for zipfile in *.zip;
+    do
+        unzip \$zipfile
+        mv \$(basename \$zipfile .zip)/fastqc_data.txt \$(basename \$zipfile .zip).txt
+    done
     """
 }
 
@@ -522,11 +529,18 @@ if (params.trimming) {
 
         output:
         file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
+        tuple val(samplename), val(single_end), path("*.txt") into post_filter_quality_data
 
         script:
         
         """
         fastqc --quiet --threads $task.cpus $reads
+
+        for zipfile in *.zip;
+        do
+            unzip \$zipfile
+            mv \$(basename \$zipfile .zip)/fastqc_data.txt \$(basename \$zipfile .zip).txt
+        done
         """
     }
 }
@@ -1035,6 +1049,28 @@ process KAIJU {
     -o ${samplename}_kaiju.names.out
 
     """
+}
+
+process GENERATE_QUALITY_RESULTS {
+    label "process_low"
+
+    input:
+    val(samplename), val(single_end), path("*.txt") into pre_filter_quality_data.join(post_filter_quality_data).tolist()
+
+    output:
+
+
+    script:
+    """
+    
+
+
+    """
+
+
+
+
+
 }
 
 
