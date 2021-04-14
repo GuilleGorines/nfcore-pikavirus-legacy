@@ -31,16 +31,18 @@ def print_basic_report_data(report, post_pre):
 ## Sample name is supplied
 
 samplename = sys.argv[1]
-paired_end = sys.argv[2]
+single_end = sys.argv[2]
 result_dir = sys.argv[3]
 
-if paired_end:
+if single_end:
+	pre_data = [sys.argv[4]]
+	post_data= [sys.argv[5]]
+
+else:	
 	pre_data= [sys.argv[4],sys.argv[5]].sort()
 	post_data = [sys.argv[6],sys.argv[7]].sort()
 
-else:
-	pre_data = [sys.argv[4]]
-	post_data= [sys.argv[5]]
+
 
 ## Organize reports based on trimmed (post) or not yet (pre)
 

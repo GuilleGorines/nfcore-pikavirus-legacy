@@ -1040,8 +1040,6 @@ process KAIJU {
     -o ${samplename}_kaiju_summary.tsv \\
     ${samplename}_kaiju.out
 
-
-
     kaiju-addTaxonNames \\
     -t $kaijudb/nodes.dmp \\
     -n $kaijudb/names.dmp \\
@@ -1051,26 +1049,45 @@ process KAIJU {
     """
 }
 
-process GENERATE_QUALITY_RESULTS {
+process EXTRACT_QUALITY_RESULTS {
     label "process_low"
 
     input:
-    val(samplename), val(single_end), path("*.txt") into pre_filter_quality_data.join(post_filter_quality_data).tolist()
-
+    val(samplename), val(single_end), path(pre_filter_data), path(post_filter_data) into pre_filter_quality_data.join(post_filter_quality_data)
+    
     output:
-
+    path("*.txt") into quality_results_merged.tolist()
 
     script:
-    """
-    
-
+    txtname = "${samplename}_quality.txt"
 
     """
+    extract_fastqc_data.py $samplename $single_end $pre_filter_data $post_filter_data  > $txtname
 
+    """
+}
 
+process GENERATE_QUALITY_HTML {
+    label "process_low"
 
+    input:
+    path(quality_files) from quality_results_merged
 
+    output:
+    file("quality.html") into html_quality_result
 
+    script:
+
+    """
+    for $samplefile in $quality_files;
+    do
+        cat \$samplefile >> merged_file.txt
+
+    done
+
+    merge_quality_stats merged_file.txt > quality.html
+
+    """
 }
 
 
