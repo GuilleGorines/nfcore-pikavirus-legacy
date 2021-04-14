@@ -9,23 +9,23 @@ def print_basic_report_data(report, post_pre):
 		infile = infile.readlines()
 		for line in infile[0:100]:
 			if line.startswith("Filename"):
-				filename = line.replace("Filename\t","")
+				filename = line.replace("Filename\t","").replace("\n","")
 
 			elif line.startswith("Total Sequences"):
-				nseqs = line.replace("Total Sequences\t","")
+				nseqs = line.replace("Total Sequences\t","").replace("\n","")
 
 			elif line.startswith("Sequence length"):
-				seqlen = line.replace("Sequence length\t","")
+				seqlen = line.replace("Sequence length\t","").replace("\n","")
 
 			elif line.startswith("%GC"):
-				gc_content = line.replace("%GC\t","")
+				gc_content = line.replace("%GC\t","").replace("\n","")
 
 			html_file_name = pre_report.replace(".txt",".html")
 			html_path =f"{result_dir}/raw_fastqc/{html_file_name}"
 
 		print(f"{samplename},{post_pre},{filename},{seqlen},{nseqs},{gc_content},{html_path}\n")
 
-			return
+		return
 
 ## Going sample by sample
 ## Sample name is supplied

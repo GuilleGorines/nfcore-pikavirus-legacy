@@ -1063,7 +1063,7 @@ process EXTRACT_QUALITY_RESULTS {
     isit_single_end = single_end ? "True" : "False"
 
     """
-    extract_fastqc_data.py $samplename $isit_single_end $task.cpus $pre_filter_data $post_filter_data  > $txtname
+    extract_fastqc_data.py $samplename $isit_single_end $params.outdir $pre_filter_data $post_filter_data  > $txtname
 
     """
 }
@@ -1080,13 +1080,13 @@ process GENERATE_QUALITY_HTML {
     script:
 
     """
-    for $samplefile in $quality_files;
+    for samplefile in $quality_files;
     do
         cat \$samplefile >> merged_file.txt
 
     done
 
-    merge_quality_stats merged_file.txt > quality.html
+    merge_quality_stats.py merged_file.txt > quality.html
 
     """
 }
