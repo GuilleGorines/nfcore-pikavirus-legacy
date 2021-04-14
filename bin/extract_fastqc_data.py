@@ -23,7 +23,7 @@ def print_basic_report_data(report, post_pre):
 			html_file_name = pre_report.replace(".txt",".html")
 			html_path =f"{result_dir}/raw_fastqc/{html_file_name}"
 
-		print(f"{samplename},{post_pre},{filename},{seqlen},{nseqs},{gc_content},{html_path}\n")
+		print(f"{samplename},{post_pre},{filename},{seqlen},{nseqs},{gc_content},{html_path}")
 
 		return
 

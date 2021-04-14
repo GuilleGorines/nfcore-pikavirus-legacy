@@ -34,7 +34,8 @@ post_dict = {}
 
 
 with open(file,"r") as infile:
-	infile = infile.readlines().sort()
+	infile = sorted(infile.readlines())
+	infile = [element.split(",").replace("\n","") for element in infile]
 
 
 # 0: prepost, 1: filename, 2: seqlen, 3: nseqs, 4: gc_content, 5: path
