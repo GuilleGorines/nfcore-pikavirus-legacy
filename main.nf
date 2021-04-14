@@ -1053,10 +1053,10 @@ process EXTRACT_QUALITY_RESULTS {
     label "process_low"
 
     input:
-    val(samplename), val(single_end), path(pre_filter_data), path(post_filter_data) into pre_filter_quality_data.join(post_filter_quality_data)
+    tuple val(samplename), val(single_end), path(pre_filter_data), path(post_filter_data) from pre_filter_quality_data.join(post_filter_quality_data)
     
     output:
-    path("*.txt") into quality_results_merged.tolist()
+    path("*.txt") into quality_results_merged
 
     script:
     txtname = "${samplename}_quality.txt"
@@ -1071,7 +1071,7 @@ process GENERATE_QUALITY_HTML {
     label "process_low"
 
     input:
-    path(quality_files) from quality_results_merged
+    path(quality_files) from quality_results_merged.toList()
 
     output:
     file("quality.html") into html_quality_result
