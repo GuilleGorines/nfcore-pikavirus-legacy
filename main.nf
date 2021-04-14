@@ -465,7 +465,7 @@ process RAW_SAMPLES_FASTQC {
 
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
-    tuple val(samplename), path("*.txt") into pre_filter_quality_data
+    tuple val(samplename), val(single_end), path("*.txt") into pre_filter_quality_data
 
 
     script:
@@ -1053,16 +1053,17 @@ process EXTRACT_QUALITY_RESULTS {
     label "process_low"
 
     input:
-    tuple val(samplename), path(pre_filter_data), path(post_filter_data) from pre_filter_quality_data.join(post_filter_quality_data)
+    tuple val(samplename), val(single_end), path(pre_filter_data), path(post_filter_data) from pre_filter_quality_data.join(post_filter_quality_data)
     
     output:
     path("*.txt") into quality_results_merged
 
     script:
     txtname = "${samplename}_quality.txt"
+    end = single_end ? "True" : "False"
 
     """
-    extract_fastqc_data.py $samplename $params.outdir $pre_filter_data $post_filter_data  > $txtname
+    extract_fastqc_data.py $samplename $params.outdir $end $pre_filter_data $post_filter_data  > $txtname
 
     """
 }

@@ -23,7 +23,7 @@ def print_basic_report_data(report, post_pre):
 			html_file_name = pre_report.replace(".txt",".html")
 			html_path =f"{result_dir}/raw_fastqc/{html_file_name}"
 
-		print(f"{samplename},{post_pre},{filename},{seqlen},{nseqs},{gc_content},{html_path}")
+		print(f"{samplename},{single_end_statement},{post_pre},{filename},{seqlen},{nseqs},{gc_content},{html_path}")
 
 		return
 
@@ -32,8 +32,17 @@ def print_basic_report_data(report, post_pre):
 
 samplename = sys.argv[1]
 result_dir = sys.argv[2]
-pre_data = [sys.argv[3]]
-post_data= [sys.argv[4]]
+single_end = bool(sys.argv[3])
+
+if single_end == True:
+	pre_data = [sys.argv[4]]
+	post_data= [sys.argv[5]]
+	single_end_statement = "single_end"
+
+else:
+	pre_data = [sys.argv[4],sys.argv[5]]
+	post_data= [sys.argv[6],sys.argv[7]]
+	single_end_statement = "paired_end"
 
 
 ## Organize reports based on trimmed (post) or not yet (pre)
