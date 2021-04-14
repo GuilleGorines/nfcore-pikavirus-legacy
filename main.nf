@@ -1050,6 +1050,7 @@ process KAIJU {
 }
 
 process EXTRACT_QUALITY_RESULTS {
+    tag "$samplename"
     label "process_low"
 
     input:
@@ -1063,7 +1064,9 @@ process EXTRACT_QUALITY_RESULTS {
     end = single_end ? "True" : "False"
 
     """
-    extract_fastqc_data.py $samplename $params.outdir $end $pre_filter_data $post_filter_data  > $txtname
+    echo $pre_filter_data
+    echo $post_filter_data
+    extract_fastqc_data.py $samplename $params.outdir $end $pre_filter_data $post_filter_data > $txtname
 
     """
 }
