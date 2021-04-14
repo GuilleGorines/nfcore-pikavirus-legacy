@@ -7,7 +7,7 @@ import sys
 def print_basic_report_data(report, post_pre):
 	with open(report,"r") as infile:
 		infile = infile.readlines()
-		for line in infile:
+		for line in infile[0:100]:
 			if line.startswith("Filename"):
 				filename = line.replace("Filename\t","")
 
@@ -31,7 +31,7 @@ def print_basic_report_data(report, post_pre):
 ## Sample name is supplied
 
 samplename = sys.argv[1]
-single_end = sys.argv[2]
+single_end = bool(sys.argv[2])
 result_dir = sys.argv[3]
 
 if single_end:
