@@ -988,26 +988,27 @@ process MAPPING_METASPADES {
 
 /*
 * STEP 3.1 - Evaluating assembly
-
+*/
 process QUAST_EVALUATION {
     tag "$samplename"
     label "process_medium"
 
     input:
-    tuple val(samplename), file(contig) from contigs_quast
+    tuple val(samplename), file(contigfile) from contigs_quast
 
     output:
-    file("quast_results/report.html") into quast_results
+    file("$outputdir/report.html") into quast_results
 
     script:
+    outputdir = "quast_results_$samplename"
 
     """
     metaquast.py \\
-    -f $contig \\
-    -o quast_results
+    -f $contigfile \\
+    -o $outputdir
     """
 }
-*/
+
 
 /*
 * STEP 4 - Contig search with kaiju
