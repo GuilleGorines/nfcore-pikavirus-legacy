@@ -556,8 +556,8 @@ process SCOUT_KRAKEN2 {
     tuple val(samplename), val(single_end), path(reads),path(kraken2db) from trimmed_paired_kraken2.combine(kraken2_db_files)
 
     output:
-    tuple val(samplename), path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references,
-                                                 kraken2_reports_krona
+    tuple val(samplename), path("*.report") into kraken2_report_virus_references, kraken2_report_bacteria_references, kraken2_report_fungi_references
+    tuple val(samplename), path("*.krona") into kraken2_krona
                         
     tuple val(samplename), path("*.report"), path("*.kraken") into kraken2_virus_extraction, kraken2_bacteria_extraction, kraken2_fungi_extraction
     tuple val(samplename), val(single_end), file("*_unclassified.fastq") into unclassified_reads
@@ -573,6 +573,8 @@ process SCOUT_KRAKEN2 {
     --output ${samplename}.kraken \\
     --unclassified-out ${unclass_name} \\
     ${reads}
+
+    cat ${samplename}.kraken | cut -f 2,3 > results.krona
     """
 }
 
@@ -581,28 +583,33 @@ process SCOUT_KRAKEN2 {
  */
 if (params.kraken2krona) {
 
+    process KRONA_DB {
+
+        output:
+        path("taxonomy/") into krona_taxonomy_db
+
+        script:
+        """
+        ktUpdateTaxonomy.sh taxonomy
+        """
+    }
+
     process KRONA_KRAKEN_RESULTS {
         tag "$samplename"
         label "process_medium"
         publishDir "${params.outdir}/kraken2_krona_results", mode: params.publish_dir_mode
 
-
         input:
-        tuple val(samplename), path(report) from kraken2_reports_krona
+        tuple val(samplename), path(kronafile), path(taxonomy) from kraken2_krona.combine(krona_taxonomy_db)
 
         output:
         file("*.krona.html") into krona_taxonomy
 
         script:
+        outfile = "${samplename}.krona.html"
 
         """
-        kreport2krona.py \\
-        -r $report \\
-        -o ${samplename}.krona
-        
-        ktImportText \\
-        -o ${samplename}.krona.html \\
-        ${samplename}.krona
+        ktImportTaxonomy $kronafile -tax $taxonomy -o $outfile
         """
     }
 }
