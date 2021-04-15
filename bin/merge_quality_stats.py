@@ -69,8 +69,6 @@ print("<table class='table'>\
               <th>Sample</th>")
 
 for data in pre_list:
-
-	print(f"<th>{data[0]}</th>")
 	print(f"<th>{data[0]}</th>")
 
 print("</thead><tbody></tr>")
