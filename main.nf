@@ -181,7 +181,9 @@ process get_software_versions {
     bowtie2 --version > v_bowtie2.txt
     mash -v | grep version > v_mash.txt
     samtools --version | grep samtools > v_samtools.txt
+    spades.py -v > v_spades.txt
     bedtools -version > v_bedtools.txt
+    quast -v > v_quast.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
