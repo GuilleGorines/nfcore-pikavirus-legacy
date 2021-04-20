@@ -1035,7 +1035,7 @@ if (params.fungi) {
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from bact_ref_selection.combine(fungi_references)
+        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from fungi_ref_selection.combine(fungi_references)
 
         output:
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_fungi_references
