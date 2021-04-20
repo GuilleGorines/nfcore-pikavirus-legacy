@@ -416,10 +416,9 @@ if (params.kraken2_db.contains('.gz') || params.kraken2_db.contains('.tar')){
         path("kraken2db") into kraken2_db_files
 
         script:
-        dbname = "kraken2db"
         """
-        mkdir $dbname
-        tar -zxf $database --strip-components=1 -C $dbname
+        mkdir "kraken2db"
+        tar -zxf $database --strip-components=1 -C "kraken2db"
         """
     }
 } else {
@@ -441,10 +440,9 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || param
         path("kaijudb") into kaiju_db
 
         script:
-        kaijudbname = "kaijudb"
         """
-        mkdir $kaijudbname
-        tar -zxf $database -C $kaijudbname
+        mkdir "kaijudb"
+        tar -zxf $database -C "kaijudb"
         """
     }
 } else {
@@ -631,7 +629,7 @@ if (params.virus) {
             
             script:
             """
-            mkdir $viral_ref_name
+            mkdir "viralrefs"
             tar -xvf $virref --strip-components=1 -C "viralrefs"
             """
         }
@@ -815,7 +813,7 @@ if (params.bacteria) {
             
             script:
             """
-            mkdir $bact_ref_name
+            mkdir "bactrefs"
             tar -xvf $bactref --strip-components=1 -C "bactrefs"
             """           
         }
@@ -998,7 +996,7 @@ if (params.fungi) {
             
             script:
             """
-            mkdir $fungi_ref_name
+            mkdir "fungirefs"
             tar -xvf $fungiref --strip-components=1 -C "fungirefs"
             """     
         }
