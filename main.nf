@@ -184,6 +184,7 @@ process get_software_versions {
     spades.py -v > v_spades.txt
     bedtools -version > v_bedtools.txt
     quast -v > v_quast.txt
+
     scrape_software_versions.py &> software_versions_mqc.yaml
     """
 }
@@ -836,13 +837,13 @@ if (params.bacteria) {
         outputfile = single_end ? "--output ${samplename}_bact_extracted.fastq" : "-o ${samplename}_1_bact_extracted.fastq -o2 ${samplename}_2_bact_extracted.fastq"
         """
         extract_kraken_reads.py \\
-        -k ${output} \\
-        -r ${report} \\
+        -k $output \\
+        -r $report \\
         --taxid 2 \\
         --include-children \\
         --fastq-output \\
-        ${read} \\
-        ${outputfile}
+        $read \\
+        $outputfile
         """
     }
 
@@ -1024,7 +1025,7 @@ if (params.fungi) {
         --include-children \\
         --fastq-output \\
         $read \\
-        --output $filename
+        $outputfile
         """
     }
 

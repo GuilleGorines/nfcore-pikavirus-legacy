@@ -21,4 +21,5 @@ dependencies:
   - bioconda::quast=5.0.2 
   - bioconda::kaiju=1.7.4
   - bioconda::mash=2.3
+  - bioconda::krona=2.8
   - bioconda::biopython=1.70
