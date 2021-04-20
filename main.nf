@@ -630,10 +630,9 @@ if (params.virus) {
             path("viralrefs") into virus_references
             
             script:
-            viral_ref_name = "viralrefs"
             """
             mkdir $viral_ref_name
-            tar -xvf $virref --strip-components=1 -C $viral_ref_name
+            tar -xvf $virref --strip-components=1 -C "viralrefs"
             """
         }
     } else {
@@ -694,7 +693,7 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(reads), path(references) from virus_reads_mapping.join(bowtie_virus_references)
         
         output:
-        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_sam_virus
+        tuple val(samplename), val(single_end), path("*_virus.sam") into bowtie_alingment_sam_virus
 
         script:
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
@@ -711,13 +710,13 @@ if (params.virus) {
             bowtie2 \\
             -x "\$(basename \$ref)" \\
             ${samplereads} \\
-            -S "\$(basename -- \$ref)_vs_${samplename}.sam" \\
+            -S "\$(basename -- \$ref)_vs_${samplename}_virus.sam" \\
             --threads $task.cpus
         done
         """
     }
 
-    process SAMTOOLS_BAM_FROM_SAM {
+    process SAMTOOLS_BAM_FROM_SAM_VIRUS {
         tag "$samplename"
         label "process_medium"
 
@@ -725,8 +724,8 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
 
         output:
-        tuple val(samplename), val(single_end), path("*.sorted.bam") into bowtie_alingment_bam_virus
-        tuple val(samplename), val(single_end), path("*.sorted.bam.flagstat"), path("*.sorted.bam.idxstats"), path("*.sorted.bam.stats") into bam_stats_virus
+        tuple val(samplename), val(single_end), path("*_virus.sorted.bam") into bowtie_alingment_bam_virus
+        tuple val(samplename), val(single_end), path("*_virus.sorted.bam.flagstat"), path("*_virus.sorted.bam.idxstats"), path("*_virus.sorted.bam.stats") into bam_stats_virus
         script:
 
         """
@@ -738,19 +737,19 @@ if (params.virus) {
             -h \\
             -F4 \\
             -O BAM \\
-            -o "\$(basename \${sam} .sam).bam" \\
+            -o "\$(basename \${sam} .sam)_virus.bam" \\
             \$sam
 
             samtools sort \\
             -@ $task.cpus \\
-            -o "\$(basename \${sam} .sam).sorted.bam" \\
-            "\$(basename \${sam} .sam).bam"
+            -o "\$(basename \${sam} .sam)_virus.sorted.bam" \\
+            "\$(basename \${sam} .sam)_virus.bam"
 
-            samtools index "\$(basename \${sam} .sam).sorted.bam"
+            samtools index "\$(basename \${sam} .sam)_virus.sorted.bam"
 
-            samtools flagstat "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.flagstat"
-            samtools idxstats "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.idxstats"
-            samtools stats "\$(basename \${sam} .sam).sorted.bam" > "\$(basename \${sam} .sam).sorted.bam.stats"
+            samtools flagstat "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.flagstat"
+            samtools idxstats "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.idxstats"
+            samtools stats "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.stats"
 
         done
         """
@@ -764,18 +763,40 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_virus
 
         output:
-        tuple path("*_coverage.txt"), path("*_bedgraph.txt") into bedtools_coverage_files_virus
+        tuple path("*_coverage_virus.txt"), path("*_bedgraph_virus.txt") into bedtools_coverage_files_virus
+        tuple val(samplename), path("*_bedgraph_virus.txt") into coverage_files_virus_merge
+
 
         script:
 
         """
         for bam in $bamfiles;
         do  
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage.txt"
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph.txt"     
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_virus.txt"
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_virus.txt"     
         done      
         """
     }
+    
+    process COVERAGE_STATS_VIRUS {
+        tag "$samplename"
+        label "process_medium"
+
+        input:
+        tuple val(samplename), path(coveragefiles) from coverage_files_virus_merge
+
+        output:
+        tuple val(samplename), path("*.csv") into coverage_stats_virus
+        path("*.pdf") into coverage_graphs_virus
+        
+        script:
+        $outdirname = "${samplename}_virus"
+
+        """
+        graphs_coverage.py $outdirname $coveragefiles
+        """        
+    }
+
     
 }
 
@@ -793,10 +814,9 @@ if (params.bacteria) {
             path("bactrefs") into bacteria_references
             
             script:
-            bact_ref_name = "bactrefs"
             """
             mkdir $bact_ref_name
-            tar -xvf $bactref --strip-components=1 -C $bact_ref_name
+            tar -xvf $bactref --strip-components=1 -C "bactrefs"
             """           
         }
     }
@@ -813,7 +833,6 @@ if (params.bacteria) {
         tuple val(samplename), val(single_end), path("*_bact_extracted.fastq") into bacteria_reads_mapping
         tuple val(samplename), val(single_end), path(report), path("*_bact_extracted.fastq") into bact_ref_selection
 
-
         script:
         read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
         outputfile = single_end ? "--output ${samplename}_bact_extracted.fastq" : "-o ${samplename}_1_bact_extracted.fastq -o2 ${samplename}_2_bact_extracted.fastq"
@@ -829,50 +848,140 @@ if (params.bacteria) {
         """
     }
 
+  process MASH_DETECT_BACTERIA_REFERENCES {
+        tag "$samplename"
+        label "process_medium"
+        
+        input:
+        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from bact_ref_selection.combine(bacteria_references)
 
-    /*
-    process BOWTIE2_INDEX_BUILD_BACTERIA {
-        tag "$basename"
+        output:
+        tuple val(samplename), path("Chosen_fnas/*") into bowtie_bacteria_references
+
+        script:
+        queryname = single_end ? "${reads}" : "${samplename}.fastq"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
+        """
+        $merging
+        reference_choosing.py $report $refdir $queryname $task.cpus
+        """       
+    } 
+
+    process BOWTIE2_MAPPING_BACTERIA {
+        tag "$samplename"
+        label "process_high"
+        
+        input:
+        tuple val(samplename), val(single_end), path(reads), path(references) from bacteria_reads_mapping.join(bowtie_bacteria_references)
+        
+        output:
+        tuple val(samplename), val(single_end), path("*_bacteria.sam") into bowtie_alingment_sam_bacteria
+
+        script:
+        samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        
+        """
+        for ref in $references;
+        do
+            bowtie2-build \\
+            --seed 1 \\
+            --threads $task.cpus \\
+            \$ref \\
+            "\$(basename -- \$ref)"
+
+            bowtie2 \\
+            -x "\$(basename \$ref)" \\
+            ${samplereads} \\
+            -S "\$(basename -- \$ref)_vs_${samplename}_bacteria.sam" \\
+            --threads $task.cpus
+        done
+        """
+    }
+
+    process SAMTOOLS_BAM_FROM_SAM_BACTERIA {
+        tag "$samplename"
         label "process_medium"
 
         input:
-        tuple val(samplename), file(fasta) from assemblies_bacteria
+        tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_bacteria
 
         output:
-        tuple val(sciname), path("Bowtie2Index") into indexes_bacteria
-
+        tuple val(samplename), val(single_end), path("*_bacteria.sorted.bam") into bowtie_alingment_bam_bacteria
+        tuple val(samplename), val(single_end), path("*_bacteria.sorted.bam.flagstat"), path("*_bacteria.sorted.bam.idxstats"), path("*_bacteria.sorted.bam.stats") into bam_stats_bacteria
         script:
+
         """
-        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv $sciname Bowtie2Index
+        for sam in $samfiles;
+        do
+            samtools view \\
+            -@ $task.cpus \\
+            -b \\
+            -h \\
+            -F4 \\
+            -O BAM \\
+            -o "\$(basename \${sam} .sam)_bacteria.bam" \\
+            \$sam
+
+            samtools sort \\
+            -@ $task.cpus \\
+            -o "\$(basename \${sam} .sam)_bacteria.sorted.bam" \\
+            "\$(basename \${sam} .sam)_bacteria.bam"
+
+            samtools index "\$(basename \${sam} .sam)_bacteria.sorted.bam"
+
+            samtools flagstat "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.flagstat"
+            samtools idxstats "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.idxstats"
+            samtools stats "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.stats"
+
+        done
         """
     }
 
-    process BOWTIE2_ALIGN_BACTERIA {
-        tag "$basename"
-        label "process_high"
+    process BEDTOOLS_COVERAGE_BACTERIA {
+        tag "$samplename"
+        label "process_medium"
 
         input:
-        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_bacteria_reads
-        tuple 
+        tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_bacteria
+
         output:
+        tuple path("*_coverage_bacteria.txt"), path("*_bedgraph_bacteria.txt") into bedtools_coverage_files_bacteria
+        tuple val(samplename), path("*_bedgraph_bacteria.txt") into coverage_files_bacteria_merge
 
         script:
-        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-        sam_name = "${readname}_vs_${sciname}.sam"
 
         """
-        bowtie2 \\
-        -x ${indexes}/${sciname} \\
-        -S $sam_name
-
-        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+        for bam in $bamfiles;
+        do  
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_bacteria.txt"
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_bacteria.txt"     
+        done      
         """
     }
-    */
-}
 
+    
+    process COVERAGE_STATS_BACTERIA {
+        tag "$samplename"
+        label "process_medium"
+
+        input:
+        tuple val(samplename), path(coveragefiles) from coverage_files_bacteria_merge
+
+        output:
+        tuple val(samplename), path("*.csv") into coverage_stats_bacteria
+        path("*.pdf") into coverage_graphs_bacteria
+        
+        script:
+        $outdirname = "${samplename}_bacteria"
+
+        """
+        graphs_coverage.py $outdirname $coveragefiles
+        """        
+    }
+
+
+
+}
 
 if (params.fungi) {
 
@@ -888,10 +997,9 @@ if (params.fungi) {
             path("fungirefs") into fungi_references
             
             script:
-            fungi_ref_name = "fungirefs"
             """
             mkdir $fungi_ref_name
-            tar -xvf $fungiref --strip-components=1 -C $fungi_ref_name
+            tar -xvf $fungiref --strip-components=1 -C "fungirefs"
             """     
         }
     }
@@ -922,54 +1030,143 @@ if (params.fungi) {
         """
     }
 
-    fungi_reads_mapping.join(fungi_ref_assemblies).view()
+      process MASH_DETECT_FUNGI_REFERENCES {
+        tag "$samplename"
+        label "process_medium"
+        
+        input:
+        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from bact_ref_selection.combine(fungi_references)
 
-    /*
-    process BOWTIE2_INDEX_BUILD_FUNGI {
-        tag "$basename"
+        output:
+        tuple val(samplename), path("Chosen_fnas/*") into bowtie_fungi_references
+
+        script:
+        queryname = single_end ? "${reads}" : "${samplename}.fastq"
+        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
+        """
+        $merging
+        reference_choosing.py $report $refdir $queryname $task.cpus
+        """       
+    } 
+
+    process BOWTIE2_MAPPING_FUNGI {
+        tag "$samplename"
+        label "process_high"
+        
+        input:
+        tuple val(samplename), val(single_end), path(reads), path(references) from fungi_reads_mapping.join(bowtie_fungi_references)
+        
+        output:
+        tuple val(samplename), val(single_end), path("*_fungi.sam") into bowtie_alingment_sam_fungi
+
+        script:
+        samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
+        
+        """
+        for ref in $references;
+        do
+            bowtie2-build \\
+            --seed 1 \\
+            --threads $task.cpus \\
+            \$ref \\
+            "\$(basename -- \$ref)"
+
+            bowtie2 \\
+            -x "\$(basename \$ref)" \\
+            ${samplereads} \\
+            -S "\$(basename -- \$ref)_vs_${samplename}_fungi.sam" \\
+            --threads $task.cpus
+        done
+        """
+    }
+
+    process SAMTOOLS_BAM_FROM_SAM_FUNGI {
+        tag "$samplename"
         label "process_medium"
 
         input:
-        tuple val(sciname), file(fasta) from assemblies_fungi
+        tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_fungi
 
         output:
-        tuple val(sciname), path("Bowtie2Index") into indexes_fungi
-
+        tuple val(samplename), val(single_end), path("*_fungi.sorted.bam") into bowtie_alingment_bam_fungi
+        tuple val(samplename), val(single_end), path("*_fungi.sorted.bam.flagstat"), path("*_fungi.sorted.bam.idxstats"), path("*_fungi.sorted.bam.stats") into bam_stats_fungi
         script:
+
         """
-        bowtie2-build --seed 1 --threads $task.cpus $fasta $sciname
-        mkdir Bowtie2Index && mv $sciname Bowtie2Index
+        for sam in $samfiles;
+        do
+            samtools view \\
+            -@ $task.cpus \\
+            -b \\
+            -h \\
+            -F4 \\
+            -O BAM \\
+            -o "\$(basename \${sam} .sam)_fungi.bam" \\
+            \$sam
+
+            samtools sort \\
+            -@ $task.cpus \\
+            -o "\$(basename \${sam} .sam)_fungi.sorted.bam" \\
+            "\$(basename \${sam} .sam)_fungi.bam"
+
+            samtools index "\$(basename \${sam} .sam)_fungi.sorted.bam"
+
+            samtools flagstat "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.flagstat"
+            samtools idxstats "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.idxstats"
+            samtools stats "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.stats"
+
+        done
         """
     }
 
-    process BOWTIE2_ALIGN_FUNGI {
-        tag "$basename"
-        label "process_high"
+    process BEDTOOLS_COVERAGE_FUNGI {
+        tag "$samplename"
+        label "process_medium"
 
         input:
-        tuple val(single_end), path(individualized_read), val(sciname), path(indexes) from individualized_fungi_reads.combine(indexes_fungi)
+        tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_fungi
 
         output:
-
+        tuple path("*_coverage_fungi.txt"), path("*_bedgraph_fungi.txt") into bedtools_coverage_files_fungi
+        tuple val(samplename), path("*_coverage_fungi.txt") into coverage_files_fungi_merge
+       
         script:
-        readname = single_end ? individualized_read.take(individualized_read.lastIndexOf("_")) : individualized_read[0].take(individualized_read[0].lastIndexOf("_"))
-        sequence = single_end ? "-1 ${individualized_read}" : "-1 ${individualized_read[0]} -2 ${individualized_read[1]}" 
-        sam_name = "${readname}_vs_${sciname}.sam"
 
         """
-        bowtie2 \\
-        -x ${indexes}/${sciname} \\
-        -S $sam_name
-
-        # bowtie2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | --sra-acc <acc> | b <bam>} -S [<sam>]
+        for bam in $bamfiles;
+        do  
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_fungi.txt"
+            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_fungi.txt"     
+        done      
         """
     }
-    */
+
+    process COVERAGE_STATS_FUNGI {
+        tag "$samplename"
+        label "process_medium"
+
+        input:
+        tuple val(samplename), path(coveragefiles) from coverage_files_fungi_merge
+
+        output:
+        tuple val(samplename), path("*.csv") into coverage_stats_fungi
+        path("*.pdf") into coverage_graphs_fungi
+        
+        script:
+        $outdirname = "${samplename}_fungi"
+
+        """
+        graphs_coverage.py $outdirname $coveragefiles
+        """        
+    }
+
 }
 
-/*
-STEP 3.0 - Mapping
-*/
+
+
+
+
+
 process MAPPING_METASPADES {
     tag "$samplename"
     label "process_high"
@@ -990,14 +1187,9 @@ process MAPPING_METASPADES {
     -o metaspades_result
 
     mv metaspades_result/contigs.fasta metaspades_result/${samplename}_contigs.fasta
-
-    
     """
 }
 
-/*
-* STEP 3.1 - Evaluating assembly
-*/
 process QUAST_EVALUATION {
     tag "$samplename"
     label "process_medium"
@@ -1018,10 +1210,6 @@ process QUAST_EVALUATION {
     """
 }
 
-
-/*
-* STEP 4 - Contig search with kaiju
-*/
 process KAIJU {
     tag "$samplename"
     label "process_high"
@@ -1085,7 +1273,7 @@ process GENERATE_QUALITY_HTML {
     label "process_low"
 
     input:
-    path(quality_files) from quality_results_merged.toList()
+    path(quality_files) from quality_results_merged.collect()
 
     output:
     file("quality.html") into html_quality_result

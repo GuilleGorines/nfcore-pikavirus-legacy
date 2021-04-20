@@ -17,7 +17,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 # Needed functions
 def weighted_avg_and_std(df,values, weights):
     average = np.average(df[values], weights=df[weights])
@@ -31,10 +30,16 @@ def calculate_weighted_median(df, values, weights):
     
     return df[cumsum >= cutoff][values].iloc[0]
 
+# args managent
+
+filename=sys.argv[1]
+coverage_files=sys.argv[2:]
+
 dataframe_list = []
 
-for filename in sys.argv[2:]:
+for filename in coverage_files:
     tmp_dataframe = pd.read_table(filename,sep="\t",header=None)
+    tmp_dataframe=tmp_dataframe[~tmp_dataframe[0].str.contains("genome", na=False)]
     dataframe_list.append(tmp_dataframe)
 
 df = pd.concat(dataframe_list)
@@ -87,4 +92,4 @@ for name, df_grouped in df.groupby("gnm"):
     plt.savefig(f"{name}.pdf")
 
     newcov = pd.DataFrame.from_dict(data)
-    newcov.to_csv(f"{sys.argv[1]}_coverage_table.csv")
+    newcov.to_csv(f"{filename}_coverage_table.csv")
