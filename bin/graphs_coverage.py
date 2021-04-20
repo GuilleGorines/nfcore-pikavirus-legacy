@@ -38,7 +38,7 @@ coverage_files=sys.argv[2:]
 dataframe_list = []
 
 for filename in coverage_files:
-    tmp_dataframe = pd.read_table(filename,sep="\t",header=None)
+    tmp_dataframe = pd.read_csv(filename,sep="\t",header=None)
     tmp_dataframe=tmp_dataframe[~tmp_dataframe[0].str.contains("genome", na=False)]
     dataframe_list.append(tmp_dataframe)
 
@@ -57,7 +57,7 @@ for name, df_grouped in df.groupby("gnm"):
     mean, covsd = weighted_avg_and_std(df_grouped,"covThreshold","diffFracBelowThreshold")
     
     if mean == 0:
-        pass
+        continue
     
     minimum = min(df_grouped["covThreshold"])
     maximum = max(df_grouped["covThreshold"])
@@ -82,14 +82,17 @@ for name, df_grouped in df.groupby("gnm"):
     data[">x20"].append(y3)
     data["total"].append(y4)
     
-    plot = df_grouped.plot.line(x="covThreshold",
-                                y="diffFracAboveThreshold_percentage",
-                                title=name,
-                                xlabel="Coverage",
-                                ylabel="Frac Above Threshold (%)",
-                                legend=None)
-    
+
+    plt.figure() 
+    df_grouped.plot.line(x="covThreshold",
+                        y="diffFracAboveThreshold_percentage",
+                        legend=None)
+    plt.title(name)
+    plt.xlabel("Coverage Threshold")
+    plt.ylabel("% of reads above threshold")
+
     plt.savefig(f"{name}.pdf")
+    plt.close()
 
     newcov = pd.DataFrame.from_dict(data)
     newcov.to_csv(f"{filename}_coverage_table.csv")

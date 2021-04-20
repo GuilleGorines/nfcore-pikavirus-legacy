@@ -818,8 +818,7 @@ if (params.bacteria) {
             tar -xvf $bactref --strip-components=1 -C "bactrefs"
             """           
         }
-    }
-
+    } else {bacteria_references = Channel.fromPath(params.bact_ref_dir)}
 
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$samplename"
@@ -1001,7 +1000,8 @@ if (params.fungi) {
             tar -xvf $fungiref --strip-components=1 -C "fungirefs"
             """     
         }
-    }
+    } else { fungi_references = Channel.fromPath(params.fungi_ref_dir)}
+
 
     process EXTRACT_KRAKEN2_FUNGI {
         tag "$samplename"
