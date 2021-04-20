@@ -789,7 +789,7 @@ if (params.virus) {
         path("*.pdf") into coverage_graphs_virus
         
         script:
-        $outdirname = "${samplename}_virus"
+        outdirname = "${samplename}_virus"
 
         """
         graphs_coverage.py $outdirname $coveragefiles
@@ -971,7 +971,7 @@ if (params.bacteria) {
         path("*.pdf") into coverage_graphs_bacteria
         
         script:
-        $outdirname = "${samplename}_bacteria"
+        outdirname = "${samplename}_bacteria"
 
         """
         graphs_coverage.py $outdirname $coveragefiles
@@ -1152,7 +1152,7 @@ if (params.fungi) {
         path("*.pdf") into coverage_graphs_fungi
         
         script:
-        $outdirname = "${samplename}_fungi"
+        outdirname = "${samplename}_fungi"
 
         """
         graphs_coverage.py $outdirname $coveragefiles
