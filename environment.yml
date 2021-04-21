@@ -6,11 +6,16 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - conda-forge::python=3.6.10  # o es 3.9.1?
+  - conda-forge::python=3.6.10   # o es 3.9.1?
   - conda-forge::markdown=3.2.2
   - conda-forge::pymdown-extensions=7.1
   - conda-forge::pygments=2.6.1
+  - conda-forge::numpy=1.19.5
+  - conda-forge::matplotlib-base=3.3.4
+  - conda-forge::pandas=1.1.5
+  - conda-forge::biopython=1.78
 
+  - bioconda::nextflow=20.10.0
   - bioconda::fastqc=0.11.9
   - bioconda::fastp=0.20.1
   - bioconda::samtools=1.12
@@ -23,8 +28,3 @@ dependencies:
   - bioconda::kaiju=1.7.4
   - bioconda::mash=2.3
   - bioconda::krona=2.8
-  - bioconda::biopython=1.70
-
-  - conda-forge::pandas=1.2.4
-  - conda-forge::numpy=1.20.2
-  - conda-forge::matplotlib-base=3.1.0
