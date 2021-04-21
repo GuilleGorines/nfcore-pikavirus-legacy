@@ -1161,11 +1161,6 @@ if (params.fungi) {
 
 }
 
-
-
-
-
-
 process MAPPING_METASPADES {
     tag "$samplename"
     label "process_high"
@@ -1174,7 +1169,7 @@ process MAPPING_METASPADES {
     tuple val(samplename), val(single_end), path(reads) from unclassified_reads
 
     output:
-    tuple val(samplename), path("metaspades_result/*_contigs.fasta") into contigs, contigs_quast
+    tuple val(samplename), path("metaspades_result/contigs.fasta") into contigs, contigs_quast
 
     script:
     read = single_end ? "-s ${reads}" : "--meta -1 ${reads[0]} -2 ${reads[1]}"
@@ -1185,7 +1180,6 @@ process MAPPING_METASPADES {
     --threads $task.cpus \\
     -o metaspades_result
 
-    mv metaspades_result/contigs.fasta metaspades_result/${samplename}_contigs.fasta
     """
 }
 
