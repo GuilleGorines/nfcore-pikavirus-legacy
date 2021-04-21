@@ -763,7 +763,7 @@ if (params.virus) {
 
         output:
         tuple path("*_coverage_virus.txt"), path("*_bedgraph_virus.txt") into bedtools_coverage_files_virus
-        tuple val(samplename), path("*_bedgraph_virus.txt") into coverage_files_virus_merge
+        tuple val(samplename), path("*_coverage_virus.txt") into coverage_files_virus_merge
 
 
         script:
@@ -944,7 +944,7 @@ if (params.bacteria) {
 
         output:
         tuple path("*_coverage_bacteria.txt"), path("*_bedgraph_bacteria.txt") into bedtools_coverage_files_bacteria
-        tuple val(samplename), path("*_bedgraph_bacteria.txt") into coverage_files_bacteria_merge
+        tuple val(samplename), path("*_coverage_bacteria.txt") into coverage_files_bacteria_merge
 
         script:
 
