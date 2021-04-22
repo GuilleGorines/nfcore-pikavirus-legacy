@@ -261,8 +261,6 @@ ch_samplesheet_reformat
     .into { ch_reads_all
             ch_reads_sra }
 
-
-
 /*
  * Download and check SRA data
  */
@@ -467,6 +465,7 @@ process RAW_SAMPLES_FASTQC {
     output:
     file "*_fastqc.{zip,html}" into fastqc_results
     tuple val(samplename), val(single_end), path("*.txt") into pre_filter_quality_data
+    tuple val(samplename), path("*_fastqc.zip") into fastqc_multiqc_pre
 
 
     script:
@@ -531,6 +530,7 @@ if (params.trimming) {
         output:
         file "*_fastqc.{zip,html}" into trimmed_fastqc_results_html
         tuple val(samplename), path("*.txt") into post_filter_quality_data
+        tuple val(samplename), path("*_fastqc.zip") into fastqc_multiqc_post
 
         script:
         
@@ -613,6 +613,7 @@ if (params.kraken2krona) {
         ktImportTaxonomy $kronafile -tax $taxonomy -o $outfile
         """
     }
+
 }
 
 if (params.virus) {
@@ -795,7 +796,6 @@ if (params.virus) {
         graphs_coverage.py $outdirname $coveragefiles
         """        
     }
-
     
 }
 
@@ -957,7 +957,6 @@ if (params.bacteria) {
         """
     }
 
-    
     process COVERAGE_STATS_BACTERIA {
         tag "$samplename"
         label "process_medium"
@@ -1192,6 +1191,7 @@ process QUAST_EVALUATION {
 
     output:
     file("$outputdir/report.html") into quast_results
+    tuple val(samplename), path("$outputdir/report.tsv") into quast_multiqc
 
     script:
     outputdir = "quast_results_$samplename"
@@ -1255,8 +1255,6 @@ process EXTRACT_QUALITY_RESULTS {
     end = single_end ? "True" : "False"
 
     """
-    echo $pre_filter_data
-    echo $post_filter_data
     extract_fastqc_data.py $samplename $params.outdir $end $pre_filter_data $post_filter_data > $txtname
 
     """
@@ -1284,6 +1282,22 @@ process GENERATE_QUALITY_HTML {
 
     """
 }
+
+process MULTIQC_REPORT {
+    label "process_medium"
+
+    input:
+    tuple val(samplename), path(prev_fastqc), path(post_fastqc), path(quastdata) from fastqc_multiqc_pre.join(fastqc_multiqc_post).join(quast_multiqc)
+    
+    output:
+    tuple val(samplename), path("*") into multiqc_report_bysample
+
+    script:
+    """
+    multiqc .
+    """
+}
+
 
 
 /*
@@ -1407,7 +1421,6 @@ workflow.onComplete {
 
 
 // nf-core functions
-
 
 def nfcoreHeader() {
     // Log colors ANSI codes
