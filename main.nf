@@ -648,6 +648,7 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
+        
         tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
@@ -684,13 +685,28 @@ if (params.virus) {
         reference_choosing.py $report $refdir $queryname $task.cpus
         """       
     } 
+    
+    virus_reads_mapping.join(bowtie_virus_references).set{bowtie_virus_channel}
+
+    def rawlist_virus = bowtie_virus_channel.toList().get()
+    def bowtielist_virus = []
+
+    for (line in rawlist_virus) {
+        for (reference in line[3]) {
+            def ref_slice = [line[0],line[1],line[2],reference]
+            bowtielist_virus.add(ref_slice)
+        }
+    }
+
+    def virus_reads_mapping = Channel.fromList(bowtielist_virus)
+
 
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
         label "process_high"
         
         input:
-        tuple val(samplename), val(single_end), path(reads), path(references) from virus_reads_mapping.join(bowtie_virus_references)
+        tuple val(samplename), val(single_end), path(reads), path(reference) from virus_reads_mapping
         
         output:
         tuple val(samplename), val(single_end), path("*_virus.sam") into bowtie_alingment_sam_virus
@@ -699,20 +715,18 @@ if (params.virus) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-        for ref in $references;
-        do
-            bowtie2-build \\
-            --seed 1 \\
-            --threads $task.cpus \\
-            \$ref \\
-            "\$(basename -- \$ref)"
+        bowtie2-build \\
+        --seed 1 \\
+        --threads $task.cpus \\
+        $reference \\
+        "\$(basename -- $reference)"
 
-            bowtie2 \\
-            -x "\$(basename \$ref)" \\
-            ${samplereads} \\
-            -S "\$(basename -- \$ref)_vs_${samplename}_virus.sam" \\
-            --threads $task.cpus
-        done
+        bowtie2 \\
+        -x "\$(basename $reference)" \\
+        ${samplereads} \\
+        -S "\$(basename -- \$ref)_vs_${samplename}_virus.sam" \\
+        --threads $task.cpus
+        
         """
     }
 
