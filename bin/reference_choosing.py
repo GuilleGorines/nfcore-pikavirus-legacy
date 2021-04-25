@@ -62,16 +62,16 @@ with open(reference_naming) as refids:
     refids = [line for line in refids if line[1] in idlist or line[2] in idlist]
 
 # Extract filenames
-filelist = {line[6]:[] for line in refids}
-
+filelist = [line[6] for line in refids]
+filedict = {}
 
 # Look for present filenames path
 for filename in os.listdir(reference_directory):
-    if filename in filelist.keys():
-        filelist[filename].append(f"{reference_directory}/{filename}")
+    if filename in filelist:
+        filedict[filename]=f"{reference_directory}/{filename}"
 
 os.mkdir(f"Chosen_fnas", 0o777)
 
-for filename,path in filelist.items():
+for filename,path in filedict.items():
     shutil.copyfile(path,f"Chosen_fnas/{filename}")
 
