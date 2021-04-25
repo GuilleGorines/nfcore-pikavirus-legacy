@@ -36,11 +36,14 @@ def helpMessage() {
       --kraken2krona [bool]           Generate a Krona chart from results obtained from kraken (Default: true)
       --kaiju_db [path]               Kaiju database for contig identification (Default: @TODO )
       --virus [bool]                  Search for virus (Default: true)
-      --vir_ref_dir [path]          Path to the ref data used to map against virus (Default: ) ####################
+      --vir_ref_dir [path]            Path to the ref data used to map against virus (Default: ) ####################
+      --vir_dir_repo [path]           Path to the tsv file containing data from the files included in the vir_ref_dir
       --bacteria [bool]               Search for bacteria (Default: true)
-      --bact_ref_dir [path]       Path to the ref data used to map against bacteria (Default: ) ####################
+      --bact_ref_dir [path]           Path to the ref data used to map against bacteria (Default: ) ####################
+      --bact_dir_repo [path]          Path to the tsv file containing data from the bacteria assemblies included in the bact_ref_dir
       --fungi [bool]                  Search for fungi (Default: true)
       --fungi_ref_dir [path]          Path to the ref data used to map against fungi (Default: ) ####################
+      --fungi_dir_repo [path]         Path to the tsv file containing data from the fungi assemblies included in the bact_ref_dir
       --skip_assembly [bool]          Skip the assembly steps (Default: false)
       --cleanup [bool]                Remove intermediate files after pipeline completion (Default: false)
       --outdir [file]                 The output directory where the results will be saved (Default: './results')
@@ -624,7 +627,7 @@ if (params.virus) {
             label 'error_retry'
 
             input:
-            path(virref) from params.vir_ref_dir
+            path(ref_vir) from params.vir_ref_dir
 
             output:
             path("viralrefs") into virus_references
@@ -632,11 +635,31 @@ if (params.virus) {
             script:
             """
             mkdir "viralrefs"
-            tar -xvf $virref --strip-components=1 -C "viralrefs"
+            tar -xvf $ref_vir --strip-components=1 -C "viralrefs"
             """
         }
     } else {
         virus_references = Channel.fromPath(params.vir_ref_dir)
+    }
+
+    virus_reference_datafile = Channel.fromPath(params.vir_dir_repo)
+
+    process FILTER_VIRUS_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(report), path(datafile) from kraken2_report_virus_references.combine(virus_reference_datafile)
+        path(refdir_virus) from virus_references
+        
+        output:
+        tuple val(samplename), path("Chosen_fnas/*") into filtered_refs_virus
+        tuple val(samplename), path("Chosen_fnas") itno filtered_refs_dir_virus
+        script:
+
+        """
+        reference_choosing.py $report $datafile $refdir_virus       
+        """
     }
 
     process EXTRACT_KRAKEN2_VIRUS {
@@ -648,13 +671,13 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
-        
+        tuple val(samplename), path("*_merged.fastq") into virus_reads_choosing_mash
         tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
         outputfile = single_end ? "--output ${samplename}_virus_extracted.fastq" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
-
+        merge_outputfile = single_end ? "" : "cat ${samplename}_1_virus_extracted.fastq ${reads[1]}_2_virus_extracted.fastq > ${samplename}_merged.fastq"
         """
         extract_kraken_reads.py \\
         -k $output \\
@@ -664,28 +687,60 @@ if (params.virus) {
         --fastq-output \\
         $read \\
         $outputfile
+
+        $merge_outputfile
         """
     }
-    
+
+    virus_reads_choosing_mash.join(filtered_refs_virus).set{virus_reads_choosing_ref}
+
+    def rawlist_virus_mash = virus_reads_choosing_ref.toList().get()
+    def mashlist_virus = []
+
+    for (line in rawlist_virus_mash) {
+        for (reference in line[2]) {
+            def ref_slice = [line[0], line[1], reference]
+            mashlist_virus.add(ref_slice)
+        }
+    }
+    def virus_reads_choosing_ref = Channel.fromList(mashlist_virus)
+
     process MASH_DETECT_VIRUS_REFERENCES {
         tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from vir_ref_selection.combine(virus_references)
+        tuple val(samplename), path(reads), path(ref) from virus_reads_choosing_ref
 
         output:
-        tuple val(samplename), path("Chosen_fnas/*") into bowtie_virus_references
+        tuple val(samplename), path($mashout) into mash_result_virus_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}.fastq"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
+        mashout = "mash_results_virus_${samplename}_${ref}.txt"
+        
         """
-        $merging
-        reference_choosing.py $report $refdir $queryname $task.cpus
+        mash dist -p $task.cpus $ref $reads -o $mashout
         """       
     } 
     
+    process SELECT_FINAL_VIRUS_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(mashresult), path(refdir_filtered) from mash_result_virus_references.groupTuple(by: 1).join(filtered_refs_dir_virus)
+
+        output:
+        tuple val(samplename), path("Final_fnas/*") into bowtie_virus_references
+
+        script:
+        """
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        extract_significative_references.py merged_mash_result.txt $refdir
+
+        """
+    }
+
     virus_reads_mapping.join(bowtie_virus_references).set{bowtie_virus_channel}
 
     def rawlist_virus = bowtie_virus_channel.toList().get()
@@ -871,8 +926,7 @@ if (params.bacteria) {
         tuple val(samplename), path("Chosen_fnas/*") into bowtie_bacteria_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}.fastq"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
+   
         """
         $merging
         reference_choosing.py $report $refdir $queryname $task.cpus
