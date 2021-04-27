@@ -754,7 +754,7 @@ if (params.virus) {
     def bowtielist_virus = []
 
     for (line in rawlist_virus) {
-        if (line[3] instaceof java.util.ArrayList){
+        if (line[3] instanceof java.util.ArrayList){
             last_list = line[3]
             }
             else {
