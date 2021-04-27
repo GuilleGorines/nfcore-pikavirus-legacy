@@ -698,7 +698,14 @@ if (params.virus) {
     def mashlist_virus = []
 
     for (line in rawlist_virus_mash) {
-        for (reference in line[2]) {
+        if (line[2] instanceof java.util.ArrayList) {
+            last_list = line[2]
+        }
+        else {
+            last_list = [line[2]]
+            }
+        
+        for (reference in last_list) {
             def ref_slice = [line[0], line[1], reference]
             mashlist_virus.add(ref_slice)
         }
@@ -728,7 +735,7 @@ if (params.virus) {
         label "process_low"
 
         input:
-        tuple val(samplename), path(mashresult), path(refdir_filtered) from mash_result_virus_references.groupTuple(by: 1).join(filtered_refs_dir_virus)
+        tuple val(samplename), path(mashresult), path(refdir_filtered) from mash_result_virus_references.groupTuple().join(filtered_refs_dir_virus)
 
         output:
         tuple val(samplename), path("Final_fnas/*") into bowtie_virus_references
@@ -747,9 +754,16 @@ if (params.virus) {
     def bowtielist_virus = []
 
     for (line in rawlist_virus) {
-        for (reference in line[3]) {
-            def ref_slice = [line[0],line[1],line[2],reference]
-            bowtielist_virus.add(ref_slice)
+        for (if line[3] instaceof java.util.ArrayList){
+            last_list = line[3]
+            }
+            else {
+                last_list = [line[3]]
+            }
+        
+            for (reference in last_list) {
+                def ref_slice = [line[0],line[1],line[2],reference]
+                bowtielist_virus.add(ref_slice)
         }
     }
 
