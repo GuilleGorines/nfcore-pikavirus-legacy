@@ -42,7 +42,7 @@ realpath = os.path.realpath(reference_directory)
 #   4: taxID
 #   5: scientific_name (indented)
 
-# Look for "S" in the report and extract Taxid
+# Look for "S" or "S1" in the report and extract Taxid
 with open(krakenrep) as krakenreport:
     krakenreport = [line.split("\t") for line in krakenreport.readlines()]
     idlist = []
@@ -61,18 +61,16 @@ with open(reference_naming) as refids:
     refids = [line for line in refids if line[1] in idlist or line[2] in idlist]
 
 # Extract filenames
-filelist = [line[6].split(".")[0] for line in refids]
+filelist = [line[6] for line in refids]
 
 # Look for present filenames path
 
-filedict = {filename,split(".")[0]:[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"]}
+filedict = {filename:[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"] for filename in os.listdir(reference_directory)}
 
-for filename in os.listdir(reference_directory):
-    if filename in filelist:
-        filedict[filename]=[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"]
 
 os.mkdir(f"Chosen_fnas", 0o777)
 
 for filename in filedict.keys():
-    sys.symlink(filedict[filename][0], filedict[filename][1])
+    if filename in filelist:
+        sys.symlink(filedict[filename][0], filedict[filename][1])
 
