@@ -21,8 +21,6 @@
 #    col5: Download_URL
 #    col6: File_name
 #
-#   However, in this script only the three first columns (0,1,2), and the last one (6) are needed. 
-#
 #   This schema is temporal, and will probably be updated to be less-restrictive requirement in 
 #   future releases. Don't worry, we are actively working on it!
 #
@@ -38,6 +36,7 @@ krakenrep = sys.argv[1]
 reference_naming = sys.argv[2]
 reference_directory = sys.argv[3]
 
+realpath = os.path.realpath(reference_directory)
 # Report schema:
 #   3: rank code (Unclass, Kingdom...)
 #   4: taxID
@@ -48,7 +47,7 @@ with open(krakenrep) as krakenreport:
     krakenreport = [line.split("\t") for line in krakenreport.readlines()]
     idlist = []
     for line in krakenreport:
-        if line[3] == "S":
+        if line[3] == "S" or line[3] == "S1":
             idlist.append(line[4])
 
     if len(idlist) == 0:
@@ -63,15 +62,16 @@ with open(reference_naming) as refids:
 
 # Extract filenames
 filelist = [line[6] for line in refids]
-filedict = {}
 
 # Look for present filenames path
+
+filedict = {}
 for filename in os.listdir(reference_directory):
     if filename in filelist:
-        filedict[filename]=f"{reference_directory}/{filename}"
+        filedict[filename]=[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"
 
 os.mkdir(f"Chosen_fnas", 0o777)
 
-for filename,path in filedict.items():
-    shutil.copyfile(path,f"Chosen_fnas/{filename}")
+for filename in filedict.keys():
+    sys.symlink(filedict[filename][0], filedict[filename][1])
 
