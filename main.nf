@@ -670,13 +670,14 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
-        tuple val(samplename), path("*_merged.fastq") into virus_reads_choosing_mash
+        tuple val(samplename), path(mergedfile)) into virus_reads_choosing_mash
         tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
-        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}" 
-        outputfile = single_end ? "--output ${samplename}_virus_extracted.fastq" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
-        merge_outputfile = single_end ? "" : "cat ${samplename}_1_virus_extracted.fastq ${samplename}_2_virus_extracted.fastq > ${samplename}_merged.fastq"
+        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        mergedfile = single_end ? "${samplename}_virus_extracted.fastq": "${samplename}_merged.fastq"
+        outputfile = single_end ? "--output $mergedfile" : "-o ${samplename}_1_virus_extracted.fastq -o2 ${samplename}_2_virus_extracted.fastq"
+        merge_outputfile = single_end ? "" : "cat ${samplename}_1_virus_extracted.fastq ${samplename}_2_virus_extracted.fastq > $mergedfile"
         """
         extract_kraken_reads.py \\
         -k $output \\
