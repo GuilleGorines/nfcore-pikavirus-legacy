@@ -649,8 +649,7 @@ if (params.virus) {
         label "process_low"
 
         input:
-        tuple val(samplename), path(report), path(datafile) from kraken2_report_virus_references.combine(virus_reference_datafile)
-        path(refdir_virus) from virus_references
+        tuple val(samplename), path(report), path(datafile),path(refdir_virus) from kraken2_report_virus_references.combine(virus_reference_datafile).combine(virus_references)
         
         output:
         tuple val(samplename), path("Chosen_fnas/*") into filtered_refs_virus
@@ -754,7 +753,7 @@ if (params.virus) {
     def bowtielist_virus = []
 
     for (line in rawlist_virus) {
-        for (if line[3] instaceof java.util.ArrayList){
+        if (line[3] instaceof java.util.ArrayList){
             last_list = line[3]
             }
             else {

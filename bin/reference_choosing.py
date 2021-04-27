@@ -61,14 +61,15 @@ with open(reference_naming) as refids:
     refids = [line for line in refids if line[1] in idlist or line[2] in idlist]
 
 # Extract filenames
-filelist = [line[6] for line in refids]
+filelist = [line[6].split(".")[0] for line in refids]
 
 # Look for present filenames path
 
-filedict = {}
+filedict = {filename,split(".")[0]:[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"]}
+
 for filename in os.listdir(reference_directory):
     if filename in filelist:
-        filedict[filename]=[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"
+        filedict[filename]=[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"]
 
 os.mkdir(f"Chosen_fnas", 0o777)
 
