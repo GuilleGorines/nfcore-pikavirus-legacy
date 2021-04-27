@@ -670,7 +670,7 @@ if (params.virus) {
 
         output:
         tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
-        tuple val(samplename), path(mergedfile)) into virus_reads_choosing_mash
+        tuple val(samplename), path(mergedfile) into virus_reads_choosing_mash
         tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
@@ -720,13 +720,13 @@ if (params.virus) {
         tuple val(samplename), path(reads), path(ref) from virus_reads_choosing_ref
 
         output:
-        tuple val(samplename), path($mashout) into mash_result_virus_references
+        tuple val(samplename), path(mashout) into mash_result_virus_references
 
         script:
         mashout = "mash_results_virus_${samplename}_${ref}.txt"
         
         """
-        mash dist -p $task.cpus $ref $reads -o $mashout
+        mash dist -p $task.cpus $ref $reads > $mashout
         """       
     } 
     
@@ -743,7 +743,7 @@ if (params.virus) {
         script:
         """
         echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
-        extract_significative_references.py merged_mash_result.txt $refdir
+        extract_significative_references.py merged_mash_result.txt $refdir_filtered
 
         """
     }
