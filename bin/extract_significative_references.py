@@ -13,11 +13,11 @@ with open(mashresult) as infile:
     # remove header 
     infile = [line.split() for line in infile if not line.startswith("#")]
 
-    # get name amd remove extension of file if p-val < 0.05
+    # get name amd remove extension of file if p-val < 0.10
     infile = [line[0].split()[0] for line in infile if float(line[2]) < 0.10]
-
+    
 # files without extension 
-reference_dict = {item.split()[0]:[f"{realpath}/{item}",f"Final_fnas/{item}"] for item in os.listdir()}
+reference_dict = {item.split()[0]:[f"{realpath}/{item}",f"Final_fnas/{item}"] for item in os.listdir(refdir)}
 
 os.mkdir(f"Final_fnas", 0o777)
 
