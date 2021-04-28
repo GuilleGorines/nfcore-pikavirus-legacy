@@ -3,7 +3,6 @@
 import sys
 
 # necessary function to extract data
-
 def print_basic_report_data(report, post_pre,outfile):
 	with open(report,"r") as infile:
 		infile = infile.readlines()

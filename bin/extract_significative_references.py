@@ -1,4 +1,19 @@
 #!/usr/bin/env python
+#
+# USAGE:
+# Checks MASH result, extracts the name of the significative references found in the given directory,
+# and creates a symlink for nextflow to pick for future references.
+# 
+# INPUTS:
+# - 1: MASH file result (tsv format, obtained from mash dist)
+# - 2: path to directory containing the reference data
+#
+#
+# DISCLAIMER: this script has exclusively been developed for the correct functioning of nf-core pikavirus,
+# and therefore is not guaranteed to function properly in other settings. Despite this, feel free to use it
+# at will.
+
+
 
 import sys
 import os
@@ -13,7 +28,7 @@ with open(mashresult) as infile:
     # remove header 
     infile = [line.split() for line in infile if not line.startswith("#")]
 
-    # get name amd remove extension of file if p-val < 0.10
+    # get name, remove extension of file if p-val < 0.10
     infile = [line[0].split()[0] for line in infile if float(line[2]) < 0.10]
     
 # files without extension 
