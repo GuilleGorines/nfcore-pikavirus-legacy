@@ -54,19 +54,16 @@ with open(krakenrep) as krakenreport:
         print(f"No species were identified in the kraken report.")
         sys.exit(2)    
 
-print(f"IDLIST:\n{idlist}")
 # Look for the found taxids in the reference file:
 with open(reference_naming) as refids:
     refids = refids.readlines()
     refids = [line.strip("\n").split("\t") for line in refids]
     refids = [line for line in refids if line[1] in idlist or line[2] in idlist]
 
-print(f"REFIDS:\n{refids}")
 # Extract filenames
 filelist = [line[6] for line in refids]
-print(f"FILELIST:\n{filelist}")
-# Look for present filenames path
 
+# Look for present filenames path
 filedict = {filename:[f"{realpath}/{filename}",f"Chosen_fnas/{filename}"] for filename in os.listdir(reference_directory)}
 
 

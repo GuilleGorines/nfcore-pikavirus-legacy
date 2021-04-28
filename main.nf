@@ -623,7 +623,7 @@ if (params.virus) {
     
     if (params.vir_ref_dir.endsWith('.gz') || params.vir_ref_dir.endsWith('.tar') || params.vir_ref_dir.endsWith('.tgz')) {
 
-        process UNCOMPRESS_VIR_REF {
+        process UNCOMPRESS_VIRUS_REF {
             label 'error_retry'
 
             input:
@@ -671,7 +671,6 @@ if (params.virus) {
         output:
         tuple val(samplename), val(single_end), path("*_virus_extracted.fastq") into virus_reads_mapping
         tuple val(samplename), path(mergedfile) into virus_reads_choosing_mash
-        tuple val(samplename), val(single_end), path(report), path("*_virus_extracted.fastq") into vir_ref_selection
 
         script:
         read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
@@ -768,7 +767,6 @@ if (params.virus) {
     }
 
     def virus_reads_mapping = Channel.fromList(bowtielist_virus)
-
 
     process BOWTIE2_MAPPING_VIRUS {
         tag "$samplename"
@@ -884,24 +882,45 @@ if (params.virus) {
 
 if (params.bacteria) {
 
-    if (params.bact_ref_dir.endsWith('.gz') || params.bact_ref_dir.endsWith('.tar') || params.bact_ref_dir.endsWith('.tgz')) {
+      if (params.bact_ref_dir.endsWith('.gz') || params.bact_ref_dir.endsWith('.tar') || params.bact_ref_dir.endsWith('.tgz')) {
 
         process UNCOMPRESS_BACT_REF {
             label 'error_retry'
 
             input:
-            path(bactref) from params.bact_ref_dir
+            path(ref_vir) from params.bact_ref_dir
 
             output:
-            path("bactrefs") into bacteria_references
+            path("viralrefs") into bacteria_references
             
             script:
             """
-            mkdir "bactrefs"
-            tar -xvf $bactref --strip-components=1 -C "bactrefs"
-            """           
+            mkdir "viralrefs"
+            tar -xvf $ref_vir --strip-components=1 -C "viralrefs"
+            """
         }
-    } else {bacteria_references = Channel.fromPath(params.bact_ref_dir)}
+    } else {
+        bacteria_references = Channel.fromPath(params.bact_ref_dir)
+    }
+
+    bacteria_reference_datafile = Channel.fromPath(params.bact_dir_repo)
+
+    process FILTER_BACTERIA_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(report), path(datafile),path(refdir_bacteria) from kraken2_report_bacteria_references.combine(bacteria_reference_datafile).combine(bacteria_references)
+        
+        output:
+        tuple val(samplename), path("Chosen_fnas/*") into filtered_refs_bacteria
+        tuple val(samplename), path("Chosen_fnas") into filtered_refs_dir_bacteria
+        script:
+
+        """
+        reference_choosing.py $report $datafile $refdir_bacteria       
+        """
+    }
 
     process EXTRACT_KRAKEN2_BACTERIA {
         tag "$samplename"
@@ -911,12 +930,14 @@ if (params.bacteria) {
         tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_bacteria.join(kraken2_bacteria_extraction)
 
         output:
-        tuple val(samplename), val(single_end), path("*_bact_extracted.fastq") into bacteria_reads_mapping
-        tuple val(samplename), val(single_end), path(report), path("*_bact_extracted.fastq") into bact_ref_selection
+        tuple val(samplename), val(single_end), path("*_bacteria_extracted.fastq") into bacteria_reads_mapping
+        tuple val(samplename), path(mergedfile) into bacteria_reads_choosing_mash
 
         script:
-        read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        outputfile = single_end ? "--output ${samplename}_bact_extracted.fastq" : "-o ${samplename}_1_bact_extracted.fastq -o2 ${samplename}_2_bact_extracted.fastq"
+        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        mergedfile = single_end ? "${samplename}_bacteria_extracted.fastq": "${samplename}_merged.fastq"
+        outputfile = single_end ? "--output $mergedfile" : "-o ${samplename}_1_bacteria_extracted.fastq -o2 ${samplename}_2_bacteria_extracted.fastq"
+        merge_outputfile = single_end ? "" : "cat ${samplename}_1_bacteria_extracted.fastq ${samplename}_2_bacteria_extracted.fastq > $mergedfile"
         """
         extract_kraken_reads.py \\
         -k $output \\
@@ -926,33 +947,94 @@ if (params.bacteria) {
         --fastq-output \\
         $read \\
         $outputfile
+
+        $merge_outputfile
         """
     }
 
-  process MASH_DETECT_BACTERIA_REFERENCES {
+    bacteria_reads_choosing_mash.join(filtered_refs_bacteria).set{bacteria_reads_choosing_ref}
+
+    def rawlist_bacteria_mash = bacteria_reads_choosing_ref.toList().get()
+    def mashlist_bacteria = []
+
+    for (line in rawlist_bacteria_mash) {
+        if (line[2] instanceof java.util.ArrayList) {
+            last_list = line[2]
+        }
+        else {
+            last_list = [line[2]]
+            }
+        
+        for (reference in last_list) {
+            def ref_slice = [line[0], line[1], reference]
+            mashlist_bacteria.add(ref_slice)
+        }
+    }
+    def bacteria_reads_choosing_ref = Channel.fromList(mashlist_bacteria)
+
+    process MASH_DETECT_BACTERIA_REFERENCES {
         tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from bact_ref_selection.combine(bacteria_references)
+        tuple val(samplename), path(reads), path(ref) from bacteria_reads_choosing_ref
 
         output:
-        tuple val(samplename), path("Chosen_fnas/*") into bowtie_bacteria_references
+        tuple val(samplename), path(mashout) into mash_result_bacteria_references
 
         script:
-   
+        mashout = "mash_results_bacteria_${samplename}_${ref}.txt"
+        
         """
-        $merging
-        reference_choosing.py $report $refdir $queryname $task.cpus
+        mash dist -p $task.cpus $ref $reads > $mashout
         """       
     } 
+    
+    process SELECT_FINAL_BACTERIA_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(mashresult), path(refdir_filtered) from mash_result_bacteria_references.groupTuple().join(filtered_refs_dir_bacteria)
+
+        output:
+        tuple val(samplename), path("Final_fnas/*") into bowtie_bacteria_references
+
+        script:
+        """
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        extract_significative_references.py merged_mash_result.txt $refdir_filtered
+
+        """
+    }
+
+    bacteria_reads_mapping.join(bowtie_bacteria_references).set{bowtie_bacteria_channel}
+
+    def rawlist_bacteria = bowtie_bacteria_channel.toList().get()
+    def bowtielist_bacteria = []
+
+    for (line in rawlist_bacteria) {
+        if (line[3] instanceof java.util.ArrayList){
+            last_list = line[3]
+            }
+            else {
+                last_list = [line[3]]
+            }
+        
+            for (reference in last_list) {
+                def ref_slice = [line[0],line[1],line[2],reference]
+                bowtielist_bacteria.add(ref_slice)
+        }
+    }
+
+    def bacteria_reads_mapping = Channel.fromList(bowtielist_bacteria)
 
     process BOWTIE2_MAPPING_BACTERIA {
         tag "$samplename"
         label "process_high"
         
         input:
-        tuple val(samplename), val(single_end), path(reads), path(references) from bacteria_reads_mapping.join(bowtie_bacteria_references)
+        tuple val(samplename), val(single_end), path(reads), path(reference) from bacteria_reads_mapping
         
         output:
         tuple val(samplename), val(single_end), path("*_bacteria.sam") into bowtie_alingment_sam_bacteria
@@ -961,20 +1043,18 @@ if (params.bacteria) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-        for ref in $references;
-        do
-            bowtie2-build \\
-            --seed 1 \\
-            --threads $task.cpus \\
-            \$ref \\
-            "\$(basename -- \$ref)"
+        bowtie2-build \\
+        --seed 1 \\
+        --threads $task.cpus \\
+        $reference \\
+        "\$(basename -- $reference)"
 
-            bowtie2 \\
-            -x "\$(basename \$ref)" \\
-            ${samplereads} \\
-            -S "\$(basename -- \$ref)_vs_${samplename}_bacteria.sam" \\
-            --threads $task.cpus
-        done
+        bowtie2 \\
+        -x "\$(basename $reference)" \\
+        ${samplereads} \\
+        -S "\$(basename -- \$ref)_vs_${samplename}_bacteria.sam" \\
+        --threads $task.cpus
+        
         """
     }
 
@@ -1028,6 +1108,7 @@ if (params.bacteria) {
         tuple path("*_coverage_bacteria.txt"), path("*_bedgraph_bacteria.txt") into bedtools_coverage_files_bacteria
         tuple val(samplename), path("*_coverage_bacteria.txt") into coverage_files_bacteria_merge
 
+
         script:
 
         """
@@ -1038,7 +1119,7 @@ if (params.bacteria) {
         done      
         """
     }
-
+    
     process COVERAGE_STATS_BACTERIA {
         tag "$samplename"
         label "process_medium"
@@ -1057,47 +1138,68 @@ if (params.bacteria) {
         graphs_coverage.py $outdirname $coveragefiles
         """        
     }
-
-
-
+    
 }
+
 
 if (params.fungi) {
 
-    if (params.fungi_ref_dir.endsWith('.gz') || params.fungi_ref_dir.endsWith('.tar') || params.fungi_ref_dir.endsWith('.tgz')) {
+   if (params.fungi_ref_dir.endsWith('.gz') || params.fungi_ref_dir.endsWith('.tar') || params.fungi_ref_dir.endsWith('.tgz')) {
 
         process UNCOMPRESS_FUNGI_REF {
             label 'error_retry'
 
             input:
-            path(fungiref) from params.fungi_ref_dir
+            path(ref_vir) from params.fungi_ref_dir
 
             output:
-            path("fungirefs") into fungi_references
+            path("viralrefs") into fungi_references
             
             script:
             """
-            mkdir "fungirefs"
-            tar -xvf $fungiref --strip-components=1 -C "fungirefs"
-            """     
+            mkdir "viralrefs"
+            tar -xvf $ref_vir --strip-components=1 -C "viralrefs"
+            """
         }
-    } else { fungi_references = Channel.fromPath(params.fungi_ref_dir)}
+    } else {
+        fungi_references = Channel.fromPath(params.fungi_ref_dir)
+    }
 
+    fungi_reference_datafile = Channel.fromPath(params.fungi_dir_repo)
+
+    process FILTER_FUNGI_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(report), path(datafile),path(refdir_fungi) from kraken2_report_fungi_references.combine(fungi_reference_datafile).combine(fungi_references)
+        
+        output:
+        tuple val(samplename), path("Chosen_fnas/*") into filtered_refs_fungi
+        tuple val(samplename), path("Chosen_fnas") into filtered_refs_dir_fungi
+        script:
+
+        """
+        reference_choosing.py $report $datafile $refdir_fungi       
+        """
+    }
 
     process EXTRACT_KRAKEN2_FUNGI {
         tag "$samplename"
         label "process_medium"
-
+        
         input:
         tuple val(samplename), val(single_end), path(reads), path(report), path(output) from trimmed_paired_extract_fungi.join(kraken2_fungi_extraction)
 
         output:
-        tuple val(samplename), val(single_end), file("*_fungi_extracted.fastq") into fungi_reads_mapping
-        tuple val(samplename), val(single_end), path(report), path("*_fungi_extracted.fastq") into fungi_ref_selection
+        tuple val(samplename), val(single_end), path("*_fungi_extracted.fastq") into fungi_reads_mapping
+        tuple val(samplename), path(mergedfile) into fungi_reads_choosing_mash
 
         script:
-        read = single_end ?  "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
-        outputfile = single_end ? "--output ${samplename}_fungi_extracted.fastq" : "-o ${samplename}1_fungi_extracted.fastq -o2 ${samplename}_2_fungi_extracted.fastq"
+        read = single_end ? "-s ${reads}" : "-s1 ${reads[0]} -s2 ${reads[1]}"
+        mergedfile = single_end ? "${samplename}_fungi_extracted.fastq": "${samplename}_merged.fastq"
+        outputfile = single_end ? "--output $mergedfile" : "-o ${samplename}_1_fungi_extracted.fastq -o2 ${samplename}_2_fungi_extracted.fastq"
+        merge_outputfile = single_end ? "" : "cat ${samplename}_1_fungi_extracted.fastq ${samplename}_2_fungi_extracted.fastq > $mergedfile"
         """
         extract_kraken_reads.py \\
         -k $output \\
@@ -1107,34 +1209,94 @@ if (params.fungi) {
         --fastq-output \\
         $read \\
         $outputfile
+
+        $merge_outputfile
         """
     }
 
-      process MASH_DETECT_FUNGI_REFERENCES {
+    fungi_reads_choosing_mash.join(filtered_refs_fungi).set{fungi_reads_choosing_ref}
+
+    def rawlist_fungi_mash = fungi_reads_choosing_ref.toList().get()
+    def mashlist_fungi = []
+
+    for (line in rawlist_fungi_mash) {
+        if (line[2] instanceof java.util.ArrayList) {
+            last_list = line[2]
+        }
+        else {
+            last_list = [line[2]]
+            }
+        
+        for (reference in last_list) {
+            def ref_slice = [line[0], line[1], reference]
+            mashlist_fungi.add(ref_slice)
+        }
+    }
+    def fungi_reads_choosing_ref = Channel.fromList(mashlist_fungi)
+
+    process MASH_DETECT_FUNGI_REFERENCES {
         tag "$samplename"
         label "process_medium"
         
         input:
-        tuple val(samplename), val(single_end), path(report), path(reads), path(refdir) from fungi_ref_selection.combine(fungi_references)
+        tuple val(samplename), path(reads), path(ref) from fungi_reads_choosing_ref
 
         output:
-        tuple val(samplename), path("Chosen_fnas/*") into bowtie_fungi_references
+        tuple val(samplename), path(mashout) into mash_result_fungi_references
 
         script:
-        queryname = single_end ? "${reads}" : "${samplename}.fastq"
-        merging = single_end ? "" : "cat ${reads[0]} ${reads[1]} > ${queryname}"
+        mashout = "mash_results_fungi_${samplename}_${ref}.txt"
+        
         """
-        $merging
-        reference_choosing.py $report $refdir $queryname $task.cpus
+        mash dist -p $task.cpus $ref $reads > $mashout
         """       
     } 
+    
+    process SELECT_FINAL_FUNGI_REFERENCES {
+        tag "$samplename"
+        label "process_low"
+
+        input:
+        tuple val(samplename), path(mashresult), path(refdir_filtered) from mash_result_fungi_references.groupTuple().join(filtered_refs_dir_fungi)
+
+        output:
+        tuple val(samplename), path("Final_fnas/*") into bowtie_fungi_references
+
+        script:
+        """
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        extract_significative_references.py merged_mash_result.txt $refdir_filtered
+
+        """
+    }
+
+    fungi_reads_mapping.join(bowtie_fungi_references).set{bowtie_fungi_channel}
+
+    def rawlist_fungi = bowtie_fungi_channel.toList().get()
+    def bowtielist_fungi = []
+
+    for (line in rawlist_fungi) {
+        if (line[3] instanceof java.util.ArrayList){
+            last_list = line[3]
+            }
+            else {
+                last_list = [line[3]]
+            }
+        
+            for (reference in last_list) {
+                def ref_slice = [line[0],line[1],line[2],reference]
+                bowtielist_fungi.add(ref_slice)
+        }
+    }
+
+    def fungi_reads_mapping = Channel.fromList(bowtielist_fungi)
 
     process BOWTIE2_MAPPING_FUNGI {
         tag "$samplename"
         label "process_high"
         
         input:
-        tuple val(samplename), val(single_end), path(reads), path(references) from fungi_reads_mapping.join(bowtie_fungi_references)
+        tuple val(samplename), val(single_end), path(reads), path(reference) from fungi_reads_mapping
         
         output:
         tuple val(samplename), val(single_end), path("*_fungi.sam") into bowtie_alingment_sam_fungi
@@ -1143,20 +1305,18 @@ if (params.fungi) {
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
         
         """
-        for ref in $references;
-        do
-            bowtie2-build \\
-            --seed 1 \\
-            --threads $task.cpus \\
-            \$ref \\
-            "\$(basename -- \$ref)"
+        bowtie2-build \\
+        --seed 1 \\
+        --threads $task.cpus \\
+        $reference \\
+        "\$(basename -- $reference)"
 
-            bowtie2 \\
-            -x "\$(basename \$ref)" \\
-            ${samplereads} \\
-            -S "\$(basename -- \$ref)_vs_${samplename}_fungi.sam" \\
-            --threads $task.cpus
-        done
+        bowtie2 \\
+        -x "\$(basename $reference)" \\
+        ${samplereads} \\
+        -S "\$(basename -- \$ref)_vs_${samplename}_fungi.sam" \\
+        --threads $task.cpus
+        
         """
     }
 
@@ -1209,7 +1369,8 @@ if (params.fungi) {
         output:
         tuple path("*_coverage_fungi.txt"), path("*_bedgraph_fungi.txt") into bedtools_coverage_files_fungi
         tuple val(samplename), path("*_coverage_fungi.txt") into coverage_files_fungi_merge
-       
+
+
         script:
 
         """
@@ -1220,7 +1381,7 @@ if (params.fungi) {
         done      
         """
     }
-
+    
     process COVERAGE_STATS_FUNGI {
         tag "$samplename"
         label "process_medium"
@@ -1260,7 +1421,6 @@ process MAPPING_METASPADES {
     $read \\
     --threads $task.cpus \\
     -o metaspades_result
-
     """
 }
 
@@ -1379,8 +1539,6 @@ process MULTIQC_REPORT {
     multiqc .
     """
 }
-
-
 
 /*
  * STEP 9 - Completion e-mail notification - Courtesy of nf-core
