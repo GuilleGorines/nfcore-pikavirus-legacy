@@ -807,32 +807,30 @@ if (params.virus) {
         output:
         tuple val(samplename), val(single_end), path("*_virus.sorted.bam") into bowtie_alingment_bam_virus
         tuple val(samplename), val(single_end), path("*_virus.sorted.bam.flagstat"), path("*_virus.sorted.bam.idxstats"), path("*_virus.sorted.bam.stats") into bam_stats_virus
+        
         script:
 
         """
-        for sam in $samfiles;
-        do
-            samtools view \\
-            -@ $task.cpus \\
-            -b \\
-            -h \\
-            -F4 \\
-            -O BAM \\
-            -o "\$(basename \${sam} .sam)_virus.bam" \\
-            \$sam
+        samtools view \\
+        -@ $task.cpus \\
+        -b \\
+        -h \\
+        -F4 \\
+        -O BAM \\
+        -o "\$(basename $samfiles .sam)_virus.bam" \\
+        $samfiles
 
-            samtools sort \\
-            -@ $task.cpus \\
-            -o "\$(basename \${sam} .sam)_virus.sorted.bam" \\
-            "\$(basename \${sam} .sam)_virus.bam"
+        samtools sort \\
+        -@ $task.cpus \\
+        -o "\$(basename $samfiles .sam)_virus.sorted.bam" \\
+        "\$(basename $samfiles .sam)_virus.bam"
 
-            samtools index "\$(basename \${sam} .sam)_virus.sorted.bam"
+        samtools index "\$(basename $samfiles .sam)_virus.sorted.bam"
 
-            samtools flagstat "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.flagstat"
-            samtools idxstats "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.idxstats"
-            samtools stats "\$(basename \${sam} .sam)_virus.sorted.bam" > "\$(basename \${sam} .sam)_virus.sorted.bam.stats"
-
-        done
+        samtools flagstat "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.stats"
+    
         """
     }
 
@@ -847,15 +845,11 @@ if (params.virus) {
         tuple path("*_coverage_virus.txt"), path("*_bedgraph_virus.txt") into bedtools_coverage_files_virus
         tuple val(samplename), path("*_coverage_virus.txt") into coverage_files_virus_merge
 
-
         script:
 
         """
-        for bam in $bamfiles;
-        do  
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_virus.txt"
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_virus.txt"     
-        done      
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_virus.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_virus.txt"     
         """
     }
     
@@ -1071,29 +1065,26 @@ if (params.bacteria) {
         script:
 
         """
-        for sam in $samfiles;
-        do
-            samtools view \\
-            -@ $task.cpus \\
-            -b \\
-            -h \\
-            -F4 \\
-            -O BAM \\
-            -o "\$(basename \${sam} .sam)_bacteria.bam" \\
-            \$sam
+        samtools view \\
+        -@ $task.cpus \\
+        -b \\
+        -h \\
+        -F4 \\
+        -O BAM \\
+        -o "\$(basename $samfiles .sam)_bacteria.bam" \\
+        \$sam
 
-            samtools sort \\
-            -@ $task.cpus \\
-            -o "\$(basename \${sam} .sam)_bacteria.sorted.bam" \\
-            "\$(basename \${sam} .sam)_bacteria.bam"
+        samtools sort \\
+        -@ $task.cpus \\
+        -o "\$(basename $samfiles .sam)_bacteria.sorted.bam" \\
+        "\$(basename $samfiles .sam)_bacteria.bam"
 
-            samtools index "\$(basename \${sam} .sam)_bacteria.sorted.bam"
+        samtools index "\$(basename $samfiles .sam)_bacteria.sorted.bam"
 
-            samtools flagstat "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.flagstat"
-            samtools idxstats "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.idxstats"
-            samtools stats "\$(basename \${sam} .sam)_bacteria.sorted.bam" > "\$(basename \${sam} .sam)_bacteria.sorted.bam.stats"
+        samtools flagstat "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.stats"
 
-        done
         """
     }
 
@@ -1112,11 +1103,9 @@ if (params.bacteria) {
         script:
 
         """
-        for bam in $bamfiles;
-        do  
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_bacteria.txt"
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_bacteria.txt"     
-        done      
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_bacteria.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_bacteria.txt"     
+    
         """
     }
     
@@ -1333,29 +1322,25 @@ if (params.fungi) {
         script:
 
         """
-        for sam in $samfiles;
-        do
-            samtools view \\
-            -@ $task.cpus \\
-            -b \\
-            -h \\
-            -F4 \\
-            -O BAM \\
-            -o "\$(basename \${sam} .sam)_fungi.bam" \\
-            \$sam
+        samtools view \\
+        -@ $task.cpus \\
+        -b \\
+        -h \\
+        -F4 \\
+        -O BAM \\
+        -o "\$(basename $samfiles .sam)_fungi.bam" \\
+        \$sam
 
-            samtools sort \\
-            -@ $task.cpus \\
-            -o "\$(basename \${sam} .sam)_fungi.sorted.bam" \\
-            "\$(basename \${sam} .sam)_fungi.bam"
+        samtools sort \\
+        -@ $task.cpus \\
+        -o "\$(basename $samfiles .sam)_fungi.sorted.bam" \\
+        "\$(basename $samfiles .sam)_fungi.bam"
 
-            samtools index "\$(basename \${sam} .sam)_fungi.sorted.bam"
+        samtools index "\$(basename $samfiles .sam)_fungi.sorted.bam"
 
-            samtools flagstat "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.flagstat"
-            samtools idxstats "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.idxstats"
-            samtools stats "\$(basename \${sam} .sam)_fungi.sorted.bam" > "\$(basename \${sam} .sam)_fungi.sorted.bam.stats"
-
-        done
+        samtools flagstat "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.stats"
         """
     }
 
@@ -1374,11 +1359,8 @@ if (params.fungi) {
         script:
 
         """
-        for bam in $bamfiles;
-        do  
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" > "\$(basename -- \$bam)_coverage_fungi.txt"
-            bedtools genomecov -ibam \$bam -g "\$(basename -- \$bam)_length.txt" -bga >"\$(basename -- \$bam)_bedgraph_fungi.txt"     
-        done      
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_fungi.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_fungi.txt"        
         """
     }
     

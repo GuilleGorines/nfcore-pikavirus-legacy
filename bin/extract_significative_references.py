@@ -13,8 +13,6 @@
 # and therefore is not guaranteed to function properly in other settings. Despite this, feel free to use it
 # at will.
 
-
-
 import sys
 import os
 
@@ -28,8 +26,8 @@ with open(mashresult) as infile:
     # remove header 
     infile = [line.split() for line in infile if not line.startswith("#")]
 
-    # get name, remove extension of file if p-val < 0.10
-    infile = [line[0].split()[0] for line in infile if float(line[2]) < 0.10]
+    # get name, remove extension of file if p-val < 0.05
+    infile = [line[0].split()[0] for line in infile if float(line[3]) < 0.05]
     
 # files without extension 
 reference_dict = {item.split()[0]:[f"{realpath}/{item}",f"Final_fnas/{item}"] for item in os.listdir(refdir)}
