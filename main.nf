@@ -200,10 +200,10 @@ process CHECK_SAMPLESHEET {
         saveAs: { filename ->
                       if (filename.endsWith(".tsv")) "preprocess/sra/$filename"
                       else "pipeline_info/$filename"
-                }
+    }
 
     input:
-    path samplesheet from ch_input
+    path(samplesheet) from ch_input
 
     output:
     path "samplesheet.valid.csv" into ch_samplesheet_reformat
@@ -281,7 +281,7 @@ if (!params.skip_sra || !isOffline()) {
             saveAs: { filename ->
                           if (filename.endsWith(".md5")) "md5/$filename"
                           else params.save_sra_fastq ? filename : null
-                    }
+        }
 
         when:
         is_ftp
@@ -319,7 +319,7 @@ if (!params.skip_sra || !isOffline()) {
             saveAs: { filename ->
                           if (filename.endsWith(".log")) "log/$filename"
                           else params.save_sra_fastq ? filename : null
-                    }
+        }
 
         when:
         !is_ftp
@@ -458,9 +458,9 @@ process RAW_SAMPLES_FASTQC {
     tag "$samplename"
     label "process_medium"
     publishDir "${params.outdir}/raw_fastqc", mode: params.publish_dir_mode,
-        saveAs: { filename ->
+    saveAs: { filename ->
                       filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename"
-                }
+    }
 
     input:
     set val(samplename), val(single_end), path(reads) from ch_cat_fastqc
