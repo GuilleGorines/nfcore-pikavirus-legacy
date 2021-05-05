@@ -1073,7 +1073,7 @@ if (params.bacteria) {
         -F4 \\
         -O BAM \\
         -o "\$(basename $samfiles .sam)_bacteria.bam" \\
-        \$sam
+        $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
@@ -1331,7 +1331,7 @@ if (params.fungi) {
         -F4 \\
         -O BAM \\
         -o "\$(basename $samfiles .sam)_fungi.bam" \\
-        \$sam
+        $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
