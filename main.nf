@@ -856,6 +856,7 @@ if (params.virus) {
     process COVERAGE_STATS_VIRUS {
         tag "$samplename"
         label "process_medium"
+        publishDir "${params.outdir}/virus_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles) from coverage_files_virus_merge
@@ -1112,6 +1113,7 @@ if (params.bacteria) {
     process COVERAGE_STATS_BACTERIA {
         tag "$samplename"
         label "process_medium"
+        publishDir "${params.outdir}/bacteria_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles) from coverage_files_bacteria_merge
@@ -1367,6 +1369,7 @@ if (params.fungi) {
     process COVERAGE_STATS_FUNGI {
         tag "$samplename"
         label "process_medium"
+        publishDir "${params.outdir}/fungi_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles) from coverage_files_fungi_merge
