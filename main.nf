@@ -791,7 +791,7 @@ if (params.virus) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- \$ref)_vs_${samplename}_virus.sam" \\
+        -S "\$(basename -- $reference)_vs_${samplename}_virus.sam" \\
         --threads $task.cpus
         
         """
@@ -827,9 +827,9 @@ if (params.virus) {
 
         samtools index "\$(basename $samfiles .sam)_virus.sorted.bam"
 
-        samtools flagstat "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.flagstat"
-        samtools idxstats "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.idxstats"
-        samtools stats "\$(basename $samfiles .sam)_virus.sorted.bam" > "\$(basename $samfiles .sam)_virus.sorted.bam.stats"
+        samtools flagstat "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.stats"
     
         """
     }
@@ -848,8 +848,8 @@ if (params.virus) {
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_virus.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_virus.txt"     
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_virus.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_virus.txt"     
         """
     }
     
@@ -1047,7 +1047,7 @@ if (params.bacteria) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- \$ref)_vs_${samplename}_bacteria.sam" \\
+        -S "\$(basename -- $reference)_vs_\$(basename -- $samplename)_bacteria.sam" \\
         --threads $task.cpus
         
         """
@@ -1073,7 +1073,7 @@ if (params.bacteria) {
         -F4 \\
         -O BAM \\
         -o "\$(basename $samfiles .sam)_bacteria.bam" \\
-        \$sam
+        $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
@@ -1082,9 +1082,9 @@ if (params.bacteria) {
 
         samtools index "\$(basename $samfiles .sam)_bacteria.sorted.bam"
 
-        samtools flagstat "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.flagstat"
-        samtools idxstats "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.idxstats"
-        samtools stats "\$(basename $samfiles .sam)_bacteria.sorted.bam" > "\$(basename $samfiles .sam)_bacteria.sorted.bam.stats"
+        samtools flagstat "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.stats"
 
         """
     }
@@ -1104,8 +1104,8 @@ if (params.bacteria) {
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_bacteria.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_bacteria.txt"     
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .bam)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_bacteria.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .bam)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_bacteria.txt"     
     
         """
     }
@@ -1305,7 +1305,7 @@ if (params.fungi) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- \$ref)_vs_${samplename}_fungi.sam" \\
+        -S "\$(basename -- $reference)_vs_${samplename}_fungi.sam" \\
         --threads $task.cpus
         
         """
@@ -1331,7 +1331,7 @@ if (params.fungi) {
         -F4 \\
         -O BAM \\
         -o "\$(basename $samfiles .sam)_fungi.bam" \\
-        \$sam
+        $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
@@ -1361,8 +1361,8 @@ if (params.fungi) {
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles)_coverage_fungi.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles)_bedgraph_fungi.txt"        
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_fungi.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_fungi.txt"        
         """
     }
     
