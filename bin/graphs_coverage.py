@@ -10,7 +10,6 @@
 # assure its functioning in any other context. However, feel free to use any part
 # of it if desired.
 
-
 # Imports
 import sys
 import os
