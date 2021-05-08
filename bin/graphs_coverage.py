@@ -13,6 +13,7 @@
 
 # Imports
 import sys
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -95,4 +96,4 @@ for name, df_grouped in df.groupby("gnm"):
     plt.close()
 
     newcov = pd.DataFrame.from_dict(data)
-    newcov.to_csv(f"{filename}_coverage_table.csv")
+    newcov.to_csv(f"{filename}_table.csv")

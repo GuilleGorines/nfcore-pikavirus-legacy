@@ -14,6 +14,7 @@ dependencies:
   - conda-forge::matplotlib-base=3.3.4
   - conda-forge::pandas=1.1.5
   - conda-forge::biopython=1.78
+  - conda-forge::tbb=2020.2
 
   - bioconda::nextflow=20.10.0
   - bioconda::fastqc=0.11.9

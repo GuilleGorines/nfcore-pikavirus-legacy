@@ -791,7 +791,7 @@ if (params.virus) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- $reference)_vs_${samplename}_virus.sam" \\
+        -S "\$(basename $reference .fna)_vs_${samplename}_virus.sam" \\
         --threads $task.cpus
         
         """
@@ -805,8 +805,8 @@ if (params.virus) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
 
         output:
-        tuple val(samplename), val(single_end), path("*_virus.sorted.bam") into bowtie_alingment_bam_virus
-        tuple val(samplename), val(single_end), path("*_virus.sorted.bam.flagstat"), path("*_virus.sorted.bam.idxstats"), path("*_virus.sorted.bam.stats") into bam_stats_virus
+        tuple val(samplename), val(single_end), path("*.sorted.bam") into bowtie_alingment_bam_virus
+        tuple val(samplename), val(single_end), path("*.sorted.bam.flagstat"), path("*.sorted.bam.idxstats"), path("*.sorted.bam.stats") into bam_stats_virus
         
         script:
 
@@ -817,15 +817,15 @@ if (params.virus) {
         -h \\
         -F4 \\
         -O BAM \\
-        -o "\$(basename $samfiles .sam)_virus.bam" \\
+        -o "\$(basename $samfiles .sam).bam" \\
         $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
-        -o "\$(basename $samfiles .sam)_virus.sorted.bam" \\
-        "\$(basename $samfiles .sam)_virus.bam"
+        -o "\$(basename $samfiles .sam).sorted.bam" \\
+        "\$(basename $samfiles .sam).bam"
 
-        samtools index "\$(basename $samfiles .sam)_virus.sorted.bam"
+        samtools index "\$(basename $samfiles .sam).sorted.bam"
 
         samtools flagstat "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.flagstat"
         samtools idxstats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.idxstats"
@@ -848,8 +848,8 @@ if (params.virus) {
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_virus.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_virus.txt"     
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .sorted.bam)_length.txt" > "\$(basename -- $bamfiles sorted.bam)_coverage_virus.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .sorted.bam)_length.txt" -bga >"\$(basename -- $bamfiles sorted.bam)_bedgraph_virus.txt"     
         """
     }
     
@@ -1047,7 +1047,7 @@ if (params.bacteria) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- $reference)_vs_\$(basename -- $samplename)_bacteria.sam" \\
+        -S "\$(basename $reference .fna)_vs_${samplename}_bacteria.sam" \\
         --threads $task.cpus
         
         """
@@ -1061,8 +1061,8 @@ if (params.bacteria) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_bacteria
 
         output:
-        tuple val(samplename), val(single_end), path("*_bacteria.sorted.bam") into bowtie_alingment_bam_bacteria
-        tuple val(samplename), val(single_end), path("*_bacteria.sorted.bam.flagstat"), path("*_bacteria.sorted.bam.idxstats"), path("*_bacteria.sorted.bam.stats") into bam_stats_bacteria
+        tuple val(samplename), val(single_end), path("*.sorted.bam") into bowtie_alingment_bam_bacteria
+        tuple val(samplename), val(single_end), path("*.sorted.bam.flagstat"), path("*.sorted.bam.idxstats"), path("*.sorted.bam.stats") into bam_stats_bacteria
         script:
 
         """
@@ -1072,15 +1072,15 @@ if (params.bacteria) {
         -h \\
         -F4 \\
         -O BAM \\
-        -o "\$(basename $samfiles .sam)_bacteria.bam" \\
+        -o "\$(basename $samfiles .sam).bam" \\
         $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
-        -o "\$(basename $samfiles .sam)_bacteria.sorted.bam" \\
-        "\$(basename $samfiles .sam)_bacteria.bam"
+        -o "\$(basename $samfiles .sam).sorted.bam" \\
+        "\$(basename $samfiles .sam).bam"
 
-        samtools index "\$(basename $samfiles .sam)_bacteria.sorted.bam"
+        samtools index "\$(basename $samfiles .sam).sorted.bam"
 
         samtools flagstat "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.flagstat"
         samtools idxstats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.idxstats"
@@ -1097,15 +1097,15 @@ if (params.bacteria) {
         tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_bacteria
 
         output:
-        tuple path("*_coverage_bacteria.txt"), path("*_bedgraph_bacteria.txt") into bedtools_coverage_files_bacteria
-        tuple val(samplename), path("*_coverage_bacteria.txt") into coverage_files_bacteria_merge
+        tuple path("*_coverage.txt"), path("*_bedgraph.txt") into bedtools_coverage_files_bacteria
+        tuple val(samplename), path("*_coverage.txt") into coverage_files_bacteria_merge
 
 
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .bam)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_bacteria.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .bam)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_bacteria.txt"     
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .sorted.bam)_length.txt" > "\$(basename -- $bamfiles .sorted.bam)_coverage.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles .sorted.bam)_length.txt" -bga >"\$(basename -- $bamfiles .sorted.bam)_bedgraph.txt"     
     
         """
     }
@@ -1290,7 +1290,7 @@ if (params.fungi) {
         tuple val(samplename), val(single_end), path(reads), path(reference) from fungi_reads_mapping
         
         output:
-        tuple val(samplename), val(single_end), path("*_fungi.sam") into bowtie_alingment_sam_fungi
+        tuple val(samplename), val(single_end), path("*.sam") into bowtie_alingment_sam_fungi
 
         script:
         samplereads = single_end ? "-U ${reads}" : "-1 ${reads[0]} -2 ${reads[1]}"
@@ -1305,7 +1305,7 @@ if (params.fungi) {
         bowtie2 \\
         -x "\$(basename $reference)" \\
         ${samplereads} \\
-        -S "\$(basename -- $reference)_vs_${samplename}_fungi.sam" \\
+        -S "\$(basename -- $reference .fna)_vs_${samplename}_fungi.sam" \\
         --threads $task.cpus
         
         """
@@ -1319,8 +1319,8 @@ if (params.fungi) {
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_fungi
 
         output:
-        tuple val(samplename), val(single_end), path("*_fungi.sorted.bam") into bowtie_alingment_bam_fungi
-        tuple val(samplename), val(single_end), path("*_fungi.sorted.bam.flagstat"), path("*_fungi.sorted.bam.idxstats"), path("*_fungi.sorted.bam.stats") into bam_stats_fungi
+        tuple val(samplename), val(single_end), path("*.sorted.bam") into bowtie_alingment_bam_fungi
+        tuple val(samplename), val(single_end), path("*.sorted.bam.flagstat"), path("*.sorted.bam.idxstats"), path("*.sorted.bam.stats") into bam_stats_fungi
         script:
 
         """
@@ -1330,19 +1330,19 @@ if (params.fungi) {
         -h \\
         -F4 \\
         -O BAM \\
-        -o "\$(basename $samfiles .sam)_fungi.bam" \\
+        -o "\$(basename $samfiles .sam).bam" \\
         $samfiles
 
         samtools sort \\
         -@ $task.cpus \\
-        -o "\$(basename $samfiles .sam)_fungi.sorted.bam" \\
-        "\$(basename $samfiles .sam)_fungi.bam"
+        -o "\$(basename $samfiles .sam).sorted.bam" \\
+        "\$(basename $samfiles .sam).bam"
 
-        samtools index "\$(basename $samfiles .sam)_fungi.sorted.bam"
+        samtools index "\$(basename $samfiles .sam).sorted.bam"
 
-        samtools flagstat "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.flagstat"
-        samtools idxstats "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.idxstats"
-        samtools stats "\$(basename $samfiles .sam)_fungi.sorted.bam" > "\$(basename $samfiles .sam)_fungi.sorted.bam.stats"
+        samtools flagstat "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.flagstat"
+        samtools idxstats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.idxstats"
+        samtools stats "\$(basename $samfiles .sam).sorted.bam" > "\$(basename $samfiles .sam).sorted.bam.stats"
         """
     }
 
@@ -1354,15 +1354,15 @@ if (params.fungi) {
         tuple val(samplename), val(single_end), path(bamfiles) from bowtie_alingment_bam_fungi
 
         output:
-        tuple path("*_coverage_fungi.txt"), path("*_bedgraph_fungi.txt") into bedtools_coverage_files_fungi
-        tuple val(samplename), path("*_coverage_fungi.txt") into coverage_files_fungi_merge
+        tuple path("*_coverage.txt"), path("*_bedgraph.txt") into bedtools_coverage_files_fungi
+        tuple val(samplename), path("*_coverage.txt") into coverage_files_fungi_merge
 
 
         script:
 
         """
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles .bam)_coverage_fungi.txt"
-        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles .bam)_bedgraph_fungi.txt"        
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" > "\$(basename -- $bamfiles .sorted.bam)_coverage.txt"
+        bedtools genomecov -ibam $bamfiles -g "\$(basename -- $bamfiles)_length.txt" -bga >"\$(basename -- $bamfiles .sorted.bam)_bedgraph.txt"        
         """
     }
     
