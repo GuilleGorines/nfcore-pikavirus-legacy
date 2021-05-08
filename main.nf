@@ -859,7 +859,7 @@ if (params.virus) {
         publishDir "${params.outdir}/virus_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_virus_merge.collect()
+        tuple val(samplename), path(coveragefiles) from coverage_files_virus_merge.groupTuple()
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_virus
@@ -1116,7 +1116,7 @@ if (params.bacteria) {
         publishDir "${params.outdir}/bacteria_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_bacteria_merge.collect()
+        tuple val(samplename), path(coveragefiles) from coverage_files_bacteria_merge.groupTuple()
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_bacteria
@@ -1372,7 +1372,7 @@ if (params.fungi) {
         publishDir "${params.outdir}/fungi_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_fungi_merge.collect()
+        tuple val(samplename), path(coveragefiles) from coverage_files_fungi_merge.groupTuple()
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_fungi

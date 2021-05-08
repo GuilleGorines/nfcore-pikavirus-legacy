@@ -33,7 +33,7 @@ def calculate_weighted_median(df, values, weights):
 
 # args managent
 
-filename=sys.argv[1]
+outfile_name=sys.argv[1]
 coverage_files=sys.argv[2:]
 
 dataframe_list = []
@@ -96,4 +96,4 @@ for name, df_grouped in df.groupby("gnm"):
     plt.close()
 
     newcov = pd.DataFrame.from_dict(data)
-    newcov.to_csv(f"{filename}_table.csv")
+    newcov.to_csv(f"{outfile_name}_table.csv")
