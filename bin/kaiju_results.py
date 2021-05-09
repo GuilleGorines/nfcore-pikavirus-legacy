@@ -2,15 +2,9 @@
 
 import sys
 
-file = sys.argvs[1]
+outfile_name = sys.argvs[1]
+file = sys.argvs[2]
 
-with open(file) as infile:
-    infile = infile.readlines()
-infile = [item for item in infile]
-infile = [item.strip("\n").split("\t") for item in infile]
-
-unclassified = [item for item in infile if item[0]=="U"]
-classified = [item for item in infile if item[0]=="C"]
 
 # Extraer los datos de id, tamaño del contig y coverage
 def process_node_data(input_string, classified = False):
@@ -33,7 +27,6 @@ def process_node_data(input_string, classified = False):
             organism_name = item[7]
             
         else:
-            organism = str()
             taxid = str()
             score = str()
             identifiers = str()
@@ -58,3 +51,16 @@ def plot_coincidences(classified_list):
     plt.pie(plot_dict.values(),labels=plot_dict.keys())
 
 plot_coincidences(process_node_data(classified,classified=True))
+
+
+with open(file) as infile:
+    infile = infile.readlines()
+infile = [item for item in infile]
+infile = [item.strip("\n").split("\t") for item in infile]
+
+unclassified = [item for item in infile if item[0]=="U"]
+classified = [item for item in infile if item[0]=="C"]
+
+
+classified_treated = process_node_data(classified, classified=True)
+unclassified_treated = process_node_data(unclassified)

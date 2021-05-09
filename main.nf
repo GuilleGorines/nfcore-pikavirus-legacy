@@ -643,6 +643,7 @@ if (params.virus) {
     }
 
     virus_reference_datafile = Channel.fromPath(params.vir_dir_repo)
+    virus_reference_graphcoverage = Channel.fromPath(params.vir_dir_repo)
 
     process FILTER_VIRUS_REFERENCES {
         tag "$samplename"
@@ -859,7 +860,7 @@ if (params.virus) {
         publishDir "${params.outdir}/virus_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_virus_merge.groupTuple()
+        tuple val(samplename), path(coveragefiles), path(reference_virus) from coverage_files_virus_merge.groupTuple().combine(virus_reference_graphcoverage)
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_virus
@@ -869,7 +870,7 @@ if (params.virus) {
         outdirname = "${samplename}_virus"
 
         """
-        graphs_coverage.py $outdirname $coveragefiles
+        graphs_coverage.py $outdirname $reference_virus $coveragefiles
         """        
     }
     
@@ -899,6 +900,7 @@ if (params.bacteria) {
     }
 
     bacteria_reference_datafile = Channel.fromPath(params.bact_dir_repo)
+    bacteria_reference_graphcoverage = Channel.fromPath(params.bact_dir_repo)
 
     process FILTER_BACTERIA_REFERENCES {
         tag "$samplename"
@@ -1116,7 +1118,7 @@ if (params.bacteria) {
         publishDir "${params.outdir}/bacteria_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_bacteria_merge.groupTuple()
+        tuple val(samplename), path(coveragefiles), path(reference_bacteria) from coverage_files_bacteria_merge.groupTuple().combine(bacteria_reference_graphcoverage)
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_bacteria
@@ -1126,7 +1128,7 @@ if (params.bacteria) {
         outdirname = "${samplename}_bacteria"
 
         """
-        graphs_coverage.py $outdirname $coveragefiles
+        graphs_coverage.py $outdirname $reference_bacteria $coveragefiles
         """        
     }
     
@@ -1157,6 +1159,7 @@ if (params.fungi) {
     }
 
     fungi_reference_datafile = Channel.fromPath(params.fungi_dir_repo)
+    fungi_reference_graphcoverage = Channel.fromPath(params.fungi_dir_repo)
 
     process FILTER_FUNGI_REFERENCES {
         tag "$samplename"
@@ -1372,7 +1375,7 @@ if (params.fungi) {
         publishDir "${params.outdir}/fungi_coverage", mode: params.publish_dir_mode
 
         input:
-        tuple val(samplename), path(coveragefiles) from coverage_files_fungi_merge.groupTuple()
+        tuple val(samplename), path(coveragefiles), path(reference_fungi) from coverage_files_fungi_merge.groupTuple().combine(fungi_reference_graphcoverage)
 
         output:
         tuple val(samplename), path("*.csv") into coverage_stats_fungi
@@ -1382,7 +1385,7 @@ if (params.fungi) {
         outdirname = "${samplename}_fungi"
 
         """
-        graphs_coverage.py $outdirname $coveragefiles
+        graphs_coverage.py $outdirname $reference_fungi $coveragefiles
         """        
     }
 
@@ -1464,6 +1467,21 @@ process KAIJU {
     -i ${samplename}_kaiju.out \\
     -o ${samplename}_kaiju.names.out
 
+    """
+}
+
+process KAIJU {
+    tag "$samplename"
+    label "process_medium"
+
+    input:
+    tuple val(samplename), path(outfile_kaiju) from kaiju_results
+
+    output:
+
+    script:
+    """
+    kaiju_results.py $samplename $outfile_kaiju
     """
 }
 
