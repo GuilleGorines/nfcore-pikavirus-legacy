@@ -1470,7 +1470,7 @@ process KAIJU {
     """
 }
 
-process KAIJU {
+process KAIJU_RESULTS {
     tag "$samplename"
     label "process_medium"
 
