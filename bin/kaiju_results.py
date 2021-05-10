@@ -68,13 +68,22 @@ plot_coincidences(classified_treated)
 
 with open(f"{outfile_name}_kaiju_result_classified.txt","w") as outfile:
     outfile.write("Node_ID\tNode_length\tNode_coverage\tMatch_taxid\tMatch_score\tIdentifiers\tAccession_number\tOrganism\n")
-    for item in classified_treated:
-        line = "\t".join(item)
-        outfile.write(f"{line}\n")
+    for line in classified_treated:
+        for subitem in line:
+            if type(subitem) == list:
+                outline = ",".join(subitem)
+            else:
+                outline=subitem
+            outfile.write(outline)
 
+            if line.index(subitem) == len(line)-1:
+                outfile.write("\n")
+            else:
+                outfile.write("\t")
+            
 with open(f"{outfile_name}_kaiju_result_unclassified.txt","w") as outfile:
     outfile.write("Node_ID\tNode_length\tNode_coverage\n")
     for item in unclassified_treated:
-        line = "\t".join(item[0:2])
+        line = "\t".join(item[0:3])
         outfile.write(f"{line}\n")
 
