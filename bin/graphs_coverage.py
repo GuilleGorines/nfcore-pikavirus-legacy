@@ -35,7 +35,7 @@ def calculate_weighted_median(df, values, weights):
 outfile_name=sys.argv[1]
 species_data=sys.argv[2]
 
-coverage_files=[sys.argv[3:]]
+coverage_files=sys.argv[3:]
 
 with open(species_data) as species_data:
     species_data = species_data.readlines()
@@ -53,7 +53,7 @@ for item in species_data:
             item[2]=item[2].replace(extension,"")
 
 for item in coverage_files:
-        
+
     match_name_coverage = os.path.basename(item).split("_vs_")[0]
 
     for name in species_data:

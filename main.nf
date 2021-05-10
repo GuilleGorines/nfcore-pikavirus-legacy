@@ -742,7 +742,7 @@ if (params.virus) {
 
         script:
         """
-        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes" | cat $mashresult > merged_mash_result.txt
         extract_significative_references.py merged_mash_result.txt $refdir_filtered
 
         """
@@ -999,7 +999,7 @@ if (params.bacteria) {
 
         script:
         """
-        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes" | cat $mashresult > merged_mash_result.txt
         extract_significative_references.py merged_mash_result.txt $refdir_filtered
 
         """
@@ -1258,7 +1258,7 @@ if (params.fungi) {
 
         script:
         """
-        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes\n" | cat $mashresult > merged_mash_result.txt
+        echo -e "#Reference-ID\tQuery-ID\tMash-distance\tP-value\tMatching-hashes" | cat $mashresult > merged_mash_result.txt
         extract_significative_references.py merged_mash_result.txt $refdir_filtered
 
         """
