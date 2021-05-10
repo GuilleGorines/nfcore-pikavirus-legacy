@@ -2,8 +2,8 @@
 
 import sys
 
-outfile_name = sys.argvs[1]
-file = sys.argvs[2]
+outfile_name = sys.argv[1]
+file = sys.argv[2]
 
 
 # Extraer los datos de id, tamaño del contig y coverage
@@ -50,17 +50,17 @@ def plot_coincidences(classified_list):
             
     plt.pie(plot_dict.values(),labels=plot_dict.keys())
 
-plot_coincidences(process_node_data(classified,classified=True))
-
 
 with open(file) as infile:
     infile = infile.readlines()
 infile = [item for item in infile]
 infile = [item.strip("\n").split("\t") for item in infile]
 
-unclassified = [item for item in infile if item[0]=="U"]
-classified = [item for item in infile if item[0]=="C"]
+unclassified_list = [item for item in infile if item[0]=="U"]
+classified_list = [item for item in infile if item[0]=="C"]
 
 
-classified_treated = process_node_data(classified, classified=True)
-unclassified_treated = process_node_data(unclassified)
+classified_treated = process_node_data(classified_list, classified=True)
+unclassified_treated = process_node_data(unclassified_list)
+
+plot_coincidences(process_node_data(classified,classified=True))
