@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import matplotlib.pyplot as plt
 
 outfile_name = sys.argv[1]
 file = sys.argv[2]
@@ -38,7 +39,6 @@ def process_node_data(input_string, classified = False):
     return output_list
 
 def plot_coincidences(classified_list):
-    import matplotlib.pyplot as plt
     
     plot_dict = {}
     
@@ -47,9 +47,11 @@ def plot_coincidences(classified_list):
             plot_dict[item[7]] = 1
         else:
             plot_dict[item[7]] += 1
-            
+    
+    plt.figure()
     plt.pie(plot_dict.values(),labels=plot_dict.keys())
-
+    plt.title(outfile_name)
+    plt.savefig(f"{outfile_name}_kaiju_pieplot.pdf")
 
 with open(file) as infile:
     infile = infile.readlines()
@@ -59,8 +61,20 @@ infile = [item.strip("\n").split("\t") for item in infile]
 unclassified_list = [item for item in infile if item[0]=="U"]
 classified_list = [item for item in infile if item[0]=="C"]
 
-
 classified_treated = process_node_data(classified_list, classified=True)
 unclassified_treated = process_node_data(unclassified_list)
 
-plot_coincidences(process_node_data(classified,classified=True))
+plot_coincidences(classified_treated)
+
+with open(f"{outfile_name}_kaiju_result_classified.txt","w") as outfile:
+    outfile.write("Node_ID\tNode_length\tNode_coverage\tMatch_taxid\tMatch_score\tIdentifiers\tAccession_number\tOrganism\n")
+    for item in classified_treated:
+        line = "\t".join(item)
+        outfile.write(f"{line}\n")
+
+with open(f"{outfile_name}_kaiju_result_unclassified.txt","w") as outfile:
+    outfile.write("Node_ID\tNode_length\tNode_coverage\n")
+    for item in unclassified_treated:
+        line = "\t".join(item[0:2])
+        outfile.write(f"{line}\n")
+
