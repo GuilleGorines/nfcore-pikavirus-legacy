@@ -457,7 +457,7 @@ if (params.kaiju_db.endsWith('.gz') || params.kaiju_db.endsWith('.tar') || param
 process RAW_SAMPLES_FASTQC {
     tag "$samplename"
     label "process_medium"
-    publishDir "${params.outdir}/raw_fastqc", mode: params.publish_dir_mode,
+    publishDir "${params.outdir}/${samplename}/raw_fastqc", mode: params.publish_dir_mode,
     saveAs: { filename ->
                       filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename"
     }
@@ -491,7 +491,7 @@ if (params.trimming) {
     process FASTP {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/trimmed", mode: params.publish_dir_mode,
+        publishDir "${params.outdir}/${samplename}/trim_results", mode: params.publish_dir_mode,
         saveAs: { filename ->
                         filename.indexOf(".fastq") > 0 ? "trimmed/$filename" : "$filename"
                     }
@@ -525,7 +525,7 @@ if (params.trimming) {
     process TRIMMED_SAMPLES_FASTQC {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/trimmed_fastqc", mode: params.publish_dir_mode
+        publishDir "${params.outdir}/${samplename}/trimmed_fastqc", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), val(single_end), path(reads) from trimmed_paired_fastqc
@@ -601,7 +601,7 @@ if (params.kraken2krona) {
     process KRONA_KRAKEN_RESULTS {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/kraken2_krona_results", mode: params.publish_dir_mode
+        publishDir "${params.outdir}/${samplename}/kraken2_krona_results", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(kronafile), path(taxonomy) from kraken2_krona.combine(krona_taxonomy_db)
@@ -801,6 +801,7 @@ if (params.virus) {
     process SAMTOOLS_BAM_FROM_SAM_VIRUS {
         tag "$samplename"
         label "process_medium"
+        publishDir "${params.outdir}/${samplename}/bam_stats", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), val(single_end), path(samfiles) from bowtie_alingment_sam_virus
@@ -857,7 +858,7 @@ if (params.virus) {
     process COVERAGE_STATS_VIRUS {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/virus_coverage", mode: params.publish_dir_mode
+        publishDir "${params.outdir}/${samplename}/virus_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles), path(reference_virus) from coverage_files_virus_merge.groupTuple().combine(virus_reference_graphcoverage)
@@ -1115,7 +1116,7 @@ if (params.bacteria) {
     process COVERAGE_STATS_BACTERIA {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/bacteria_coverage", mode: params.publish_dir_mode
+        publishDir "${params.outdir}/${samplename}/bacteria_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles), path(reference_bacteria) from coverage_files_bacteria_merge.groupTuple().combine(bacteria_reference_graphcoverage)
@@ -1372,7 +1373,7 @@ if (params.fungi) {
     process COVERAGE_STATS_FUNGI {
         tag "$samplename"
         label "process_medium"
-        publishDir "${params.outdir}/fungi_coverage", mode: params.publish_dir_mode
+        publishDir "${params.outdir}/${samplename}/fungi_coverage", mode: params.publish_dir_mode
 
         input:
         tuple val(samplename), path(coveragefiles), path(reference_fungi) from coverage_files_fungi_merge.groupTuple().combine(fungi_reference_graphcoverage)
@@ -1394,6 +1395,7 @@ if (params.fungi) {
 process MAPPING_METASPADES {
     tag "$samplename"
     label "process_high"
+    publishDir "${params.outdir}/${samplename}/contigs", mode: params.publish_dir_mode
 
     input:
     tuple val(samplename), val(single_end), path(reads) from unclassified_reads
@@ -1415,6 +1417,7 @@ process MAPPING_METASPADES {
 process QUAST_EVALUATION {
     tag "$samplename"
     label "process_medium"
+    publishDir "${params.outdir}/${samplename}/quast_reports", mode: params.publish_dir_mode
 
     input:
     tuple val(samplename), file(contigfile) from contigs_quast
@@ -1473,11 +1476,13 @@ process KAIJU {
 process KAIJU_RESULTS {
     tag "$samplename"
     label "process_medium"
+    publishDir "${params.outdir}/${samplename}/kaiju_results", mode: params.publish_dir_mode
 
     input:
     tuple val(samplename), path(outfile_kaiju) from kaiju_results
 
     output:
+    tuple val(samplename), path("*_classified.txt"), path("*_unclassified.txt"), path("*_pieplot.pdf")
 
     script:
     """
@@ -1488,6 +1493,7 @@ process KAIJU_RESULTS {
 process EXTRACT_QUALITY_RESULTS {
     tag "$samplename"
     label "process_low"
+    publishDir "${params.outdir}/${samplename}/quality_results_pikavirus", mode: params.publish_dir_mode
 
     input:
     tuple val(samplename), val(single_end), path(pre_filter_data), path(post_filter_data) from pre_filter_quality_data.join(post_filter_quality_data)
@@ -1507,6 +1513,7 @@ process EXTRACT_QUALITY_RESULTS {
 
 process GENERATE_QUALITY_HTML {
     label "process_low"
+    publishDir "${params.outdir}/quality_results", mode: params.publish_dir_mode
 
     input:
     path(quality_files) from quality_results_merged.collect()
@@ -1530,6 +1537,7 @@ process GENERATE_QUALITY_HTML {
 
 process MULTIQC_REPORT {
     label "process_medium"
+    publishDir "${params.outdir}/multiqc_results", mode: params.publish_dir_mode
 
     input:
     tuple val(samplename), path(prev_fastqc), path(post_fastqc), path(quastdata) from fastqc_multiqc_pre.join(fastqc_multiqc_post).join(quast_multiqc)
