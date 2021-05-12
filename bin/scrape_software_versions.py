@@ -23,13 +23,15 @@ results = OrderedDict()
 results["nf-core/pikavirus"] = '<span style="color:#999999;">N/A</span>'
 results["Nextflow"] = '<span style="color:#999999;">N/A</span>'
 results["FastQC"] = '<span style="color:#999999;">N/A</span>'
-results["FastP"] = '<span style="color:#999999;">N/A</span>'
+results["Fastp"] = '<span style="color:#999999;">N/A</span>'
 results["Kraken2"] = '<span style="color:#999999;">N/A</span>'
 results["Kaiju"] = '<span style="color:#999999;">N/A</span>'
 results["Bowtie2"] = '<span style="color:#999999;">N/A</span>'
 results["Mash"] = '<span style="color:#999999;">N/A</span>'
 results["Samtools"] = '<span style="color:#999999;">N/A</span>'
-results["Bedtools"] = '<span style="color:#999999;">N/A</span>'
+results["BedTools"] = '<span style="color:#999999;">N/A</span>'
+results["Spades"] = '<span style="color:#999999;">N/A</span>'
+results["Quast"] = '<span style="color:#999999;">N/A</span>'
 
 # Search each file using its regex
 for k, v in regexes.items():
